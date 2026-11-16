@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Our HAAS — Konkani Roots, Houston Home"
+description = "A community website for Houston Area Amchigele Samaj celebrating Mangalorean Konkani roots in the USA, preserving existing HAAS content and offering secure administrator event management with a calendar date picker."
+version = "1.0.0"
+id = "artifacts/ourhaas"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24093
+
+[services.development]
+run = "pnpm --filter @workspace/ourhaas run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ourhaas", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ourhaas/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24093"
+BASE_PATH = "/"
