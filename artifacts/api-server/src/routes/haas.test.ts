@@ -1,5 +1,7 @@
 import express from "express";
 import request from "supertest";
+import { eq } from "drizzle-orm";
+import { membershipTable } from "@workspace/db";
 import { COMMITTEE_RESOURCE_SLUG, COMMITTEE_TITLE } from "@workspace/haas-content";
 import sourcePages from "../lib/source-content.json";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +24,7 @@ vi.mock("@workspace/db", () => ({
   db: mocks,
   eventsTable: { id: "id", date: "date" },
   committeeTable: { id: "id", position: "position" },
+  membershipTable: { id: "id" },
 }));
 import router from "./haas";
 
@@ -295,6 +298,152 @@ describe("authorized event management and public reads", () => {
     expect((await request(app).delete("/haas/events/42")).status).toBe(204);
     mocks.userId = null;
     expect((await request(app).get("/haas/events")).body).toEqual([]);
+  });
+});
+
+describe("membership registration safeguards", () => {
+  const membership = {
+    year: 2030,
+    registrationUrl: "https://www.zeffy.com/en-US/ticketing/haas-membership",
+    description: "Join the HAAS community.",
+    calendarPolicy: "Membership follows the calendar year.",
+    chequePolicy: "Contact the committee about cheques.",
+    discountPolicy: "Members receive event discounts.",
+    refundPolicy: "Membership fees are non-refundable.",
+  };
+  const policyFields = [
+    "description", "calendarPolicy", "chequePolicy", "discountPolicy", "refundPolicy",
+  ] as const;
+  let saved: typeof membership & { id: number };
+  const setMembership = vi.fn();
+  const updateWhere = vi.fn();
+  const readWhere = vi.fn();
+
+  beforeEach(() => {
+    // Test-local persistence only: never import or connect to a real database.
+    saved = { id: 1, ...structuredClone(membership) };
+    mocks.select.mockReturnValue({
+      from: vi.fn((table) => {
+        expect(table).toBe(membershipTable);
+        return { where: readWhere };
+      }),
+    });
+    readWhere.mockImplementation(async () => [structuredClone(saved)]);
+    mocks.update.mockImplementation((table) => {
+      expect(table).toBe(membershipTable);
+      return { set: setMembership };
+    });
+    setMembership.mockImplementation((data: typeof membership) => ({
+      where: updateWhere.mockImplementation(() => ({
+        returning: async () => {
+          saved = { ...saved, ...structuredClone(data) };
+          return [structuredClone(saved)];
+        },
+      })),
+    }));
+    mocks.userId = "user_test";
+    mocks.getUser.mockResolvedValue(identity());
+  });
+
+  async function expectPublicMembership(expected: typeof membership) {
+    mocks.userId = null;
+    const response = await request(app).get("/haas/membership");
+    expect(response.status).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.body).toEqual(expected);
+    expect(readWhere).toHaveBeenCalledWith(eq(membershipTable.id, 1));
+  }
+
+  async function expectRejectedWithoutChanges(input: Record<string, unknown>, status = 400) {
+    const before = structuredClone(saved);
+    const response = await request(app).put("/haas/membership").send(input);
+    expect(response.status).toBe(status);
+    expect(response.body.error).toEqual(expect.any(String));
+    expectNoStorageAccess();
+    expect(setMembership).not.toHaveBeenCalled();
+    expect(updateWhere).not.toHaveBeenCalled();
+    expect(saved).toEqual(before);
+    // Read through the public handler too, so the persisted singleton remains
+    // observable and unchanged after every rejected request.
+    await expectPublicMembership(membership);
+    expect(saved).toEqual(before);
+  }
+
+  it("rejects signed-out changes before identity or storage access", async () => {
+    mocks.userId = null;
+    await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 401);
+    expect(mocks.getUser).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: "another verified account", user: identity("someone@example.com") },
+    { name: "unverified assigned account", user: identity(assignedEmail, "unverified") },
+    { name: "self-claimed administrator", user: {
+      ...identity("someone@example.com"), publicMetadata: { role: "admin" },
+    } },
+  ])("rejects changes from $name", async ({ user }) => {
+    mocks.getUser.mockResolvedValue(user);
+    await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 403);
+    expect(mocks.getUser).toHaveBeenCalledWith("user_test");
+  });
+
+  for (const field of policyFields) {
+    it.each(["", "   ", "\t\r\n", "\u00a0\u2003"])(
+      `rejects blank ${field} (%j) without changing the singleton`, async (value) => {
+        await expectRejectedWithoutChanges({ ...membership, [field]: value });
+      },
+    );
+  }
+
+  it.each([1999, 2201, 2030.5, 0, -1, "2030", "", null])(
+    "rejects invalid year %j without changing the singleton", async (year) => {
+      await expectRejectedWithoutChanges({ ...membership, year });
+    },
+  );
+
+  it.each([
+    "",
+    "not-a-url",
+    "javascript:alert(1)",
+    "http://www.zeffy.com/en-US/ticketing/haas-membership",
+    "http://zeffy.com/en-US/ticketing/haas-membership",
+    "//www.zeffy.com/en-US/ticketing/haas-membership",
+    "https://zeffy.com.evil.example/pay",
+    "https://www.zeffy.com.evil.example/pay",
+    "https://notzeffy.com/pay",
+    "https://zeffy-com.example/pay",
+    "https://forms.zeffy.com/pay",
+    "https://www.zeffy.com@evil.example/pay",
+    "https://evil.example/?next=https://www.zeffy.com/",
+    "https://user@zeffy.com/pay",
+    "https://user:password@www.zeffy.com/pay",
+    "https://:password@www.zeffy.com/pay",
+  ])("rejects unsafe registration URL %j without changing the singleton", async (registrationUrl) => {
+    await expectRejectedWithoutChanges({ ...membership, registrationUrl });
+  });
+
+  it.each([
+    { year: 2000, registrationUrl: "https://www.zeffy.com/en-US/ticketing/haas-membership" },
+    { year: 2200, registrationUrl: "https://zeffy.com/en-CA/ticketing/haas-membership?source=haas" },
+    { year: 2031, registrationUrl: "https://WWW.ZEFFY.COM/en-US/ticketing/new-membership#form" },
+  ])("saves a valid HTTPS Zeffy form for $year and exposes it publicly", async (input) => {
+    const changes = {
+      ...membership, ...input,
+      ...Object.fromEntries(policyFields.map((field) => [field, ` \tUpdated ${membership[field]}\n `])),
+    };
+    const expected = {
+      ...membership, ...input,
+      registrationUrl: new URL(input.registrationUrl).href,
+      ...Object.fromEntries(policyFields.map((field) => [field, `Updated ${membership[field]}`])),
+    };
+    const response = await request(app).put("/haas/membership").send(changes);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(expected);
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith(membershipTable);
+    expect(setMembership).toHaveBeenCalledExactlyOnceWith(expected);
+    expect(updateWhere).toHaveBeenCalledExactlyOnceWith(eq(membershipTable.id, 1));
+    expect(saved).toEqual({ id: 1, ...expected });
+    await expectPublicMembership(expected);
   });
 });
 
