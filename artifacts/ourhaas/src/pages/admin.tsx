@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,11 +40,15 @@ function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone
   const create = useCreateEvent();
   const update = useUpdateEvent();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: blank });
-
-  useEffect(() => {
-    form.reset(initial ? { title: initial.title, date: initial.date, time: initial.time, location: initial.location, description: initial.description, category: initial.category } : blank);
-  }, [initial, form]);
+  // Initialize before Radix Select mounts. Resetting after mount makes its
+  // native form control emit an empty value and clears the saved category.
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: initial ? {
+      title: initial.title, date: initial.date, time: initial.time,
+      location: initial.location, description: initial.description, category: initial.category,
+    } : blank,
+  });
 
   const pending = create.isPending || update.isPending;
   const submit = (v: FormValues) => {
@@ -177,7 +181,7 @@ function Manager() {
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto rounded-3xl">
           <DialogHeader><DialogTitle className="font-display text-3xl">{editing ? "Edit event" : "New event"}</DialogTitle></DialogHeader>
-          <EventForm initial={editing} onDone={() => setFormOpen(false)} />
+          <EventForm key={editing?.id ?? "new"} initial={editing} onDone={() => setFormOpen(false)} />
         </DialogContent>
       </Dialog>
 
