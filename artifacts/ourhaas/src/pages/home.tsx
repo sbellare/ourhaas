@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ArrowUpRight, Mail } from "lucide-react";
-import { useListEvents, useListContentPages, useListCommittee, getListCommitteeQueryKey, getListEventsQueryKey, type CommunityEvent } from "@workspace/api-client-react";
+import { useListEvents, useListContentPages, useListCommittee, getListCommitteeQueryKey, getListEventsQueryKey, useGetMembership, getGetMembershipQueryKey, type CommunityEvent } from "@workspace/api-client-react";
 import { EventDialog, EventRow, EventSkeleton, LoadError, UpcomingEmpty } from "@/components/event-bits";
-import { CONTACT_EMAIL, ZEFFY_URL, initials, splitEvents } from "@/lib/haas";
+import { CONTACT_EMAIL, initials, splitEvents } from "@/lib/haas";
 
 const heroImg = `${import.meta.env.BASE_URL}hero-coast.jpg`;
 
 export default function Home() {
   const events = useListEvents({ query: { queryKey: getListEventsQueryKey(), refetchInterval: 30000 } });
   const pages = useListContentPages();
+  const membership = useGetMembership({ query: { queryKey: getGetMembershipQueryKey(), refetchInterval: 30000 } });
   const committee = useListCommittee({ query: { queryKey: getListCommitteeQueryKey(), refetchInterval: 30000 } });
   const [open, setOpen] = useState<CommunityEvent | null>(null);
   const { upcoming, past } = splitEvents(events.data);
@@ -77,24 +78,26 @@ export default function Home() {
       </section>
 
       <section className="rangoli-bg border-y border-border/60">
+        {membership.isLoading && <p role="status" className="mx-auto max-w-7xl px-5 py-14">Loading membership information…</p>}
+        {membership.isError && <div className="mx-auto max-w-7xl px-5 py-14"><LoadError what="membership information" onRetry={() => membership.refetch()} /></div>}
+        {membership.data &&
         <div className="mx-auto grid max-w-7xl gap-12 px-5 py-20 md:grid-cols-[1fr_1.2fr]">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-primary">Membership 2026</p>
+            <p className="font-mono text-xs uppercase tracking-[0.25em] text-primary">Membership {membership.data.year}</p>
             <h2 className="font-display mt-2 text-4xl font-semibold md:text-5xl">Join for the calendar year.</h2>
-            <p className="mt-4 text-muted-foreground">Membership runs January 1 through December 31. Register online through Zeffy, or by cheque payable to HAAS.</p>
+            <p className="mt-4 whitespace-pre-line text-muted-foreground">{membership.data.description}</p>
           </div>
           <div className="rounded-[2rem] border border-card-border bg-card p-8 shadow-[0_30px_60px_-40px_hsl(var(--secondary)/.6)]">
             <ul className="space-y-4 text-foreground/85">
-              <li className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />Calendar-year membership, January 1 to December 31.</li>
-              <li className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />Partial-year discounts only with committee approval.</li>
-              <li className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />Membership fees are non-refundable.</li>
+              {[membership.data.calendarPolicy, membership.data.chequePolicy, membership.data.discountPolicy, membership.data.refundPolicy].map((policy, index) =>
+                <li key={index} className="flex gap-3 whitespace-pre-line"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />{policy}</li>)}
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href={ZEFFY_URL} target="_blank" rel="noreferrer" data-testid="link-zeffy-home" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition hover:-translate-y-0.5">Register on Zeffy <ArrowUpRight className="h-4 w-4" /></a>
+              <a href={membership.data.registrationUrl} target="_blank" rel="noreferrer" data-testid="link-zeffy-home" className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition hover:-translate-y-0.5">Register on Zeffy <ArrowUpRight className="h-4 w-4" /></a>
               <Link href="/membership" className="inline-flex items-center rounded-full px-4 py-3 font-medium text-secondary hover:underline">Full details</Link>
             </div>
           </div>
-        </div>
+        </div>}
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-20">

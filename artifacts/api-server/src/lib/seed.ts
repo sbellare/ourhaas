@@ -1,8 +1,18 @@
-import { db, eventsTable, setupTable, committeeTable } from "@workspace/db";
+import { db, eventsTable, setupTable, committeeTable, membershipTable } from "@workspace/db";
 
 // Data-only initialization works in both environments, without schema changes
 // at startup. The marker prevents deleted or edited source events reappearing.
 export async function seedSourceEvents(): Promise<void> {
+  await db.insert(membershipTable).values({
+    id: 1,
+    year: 2026,
+    registrationUrl: "https://www.zeffy.com/en-US/ticketing/haas-2026-membership",
+    description: "Register online through our existing Zeffy page. Payment is handled by Zeffy; this site never collects card details.",
+    calendarPolicy: "Membership runs January 1 through December 31.",
+    chequePolicy: "Prefer paper? Make cheques payable to HAAS.",
+    discountPolicy: "Partial-year discounts are available only with committee approval.",
+    refundPolicy: "Membership fees are non-refundable.",
+  }).onConflictDoNothing({ target: membershipTable.id });
   await db.insert(committeeTable).values([
     { role: "President", name: "Sachin Bellare", position: 0 },
     { role: "Secretary", name: "Sheetal Sashital", position: 1 },

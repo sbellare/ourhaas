@@ -8,6 +8,89 @@
 import * as zod from 'zod';
 
 
+export const getMembershipResponseYearMin = 2000;
+export const getMembershipResponseYearMax = 2200;
+
+export const getMembershipResponseRegistrationUrlMax = 2000;
+
+export const getMembershipResponseDescriptionMax = 2000;
+
+export const getMembershipResponseCalendarPolicyMax = 1000;
+
+export const getMembershipResponseChequePolicyMax = 1000;
+
+export const getMembershipResponseDiscountPolicyMax = 1000;
+
+export const getMembershipResponseRefundPolicyMax = 1000;
+
+
+
+export const GetMembershipResponse = zod.object({
+  "year": zod.number().int().min(getMembershipResponseYearMin).max(getMembershipResponseYearMax),
+  "registrationUrl": zod.string().url().max(getMembershipResponseRegistrationUrlMax),
+  "description": zod.string().min(1).max(getMembershipResponseDescriptionMax),
+  "calendarPolicy": zod.string().min(1).max(getMembershipResponseCalendarPolicyMax),
+  "chequePolicy": zod.string().min(1).max(getMembershipResponseChequePolicyMax),
+  "discountPolicy": zod.string().min(1).max(getMembershipResponseDiscountPolicyMax),
+  "refundPolicy": zod.string().min(1).max(getMembershipResponseRefundPolicyMax)
+})
+
+
+export const updateMembershipBodyYearMin = 2000;
+export const updateMembershipBodyYearMax = 2200;
+
+export const updateMembershipBodyRegistrationUrlMax = 2000;
+
+export const updateMembershipBodyDescriptionMax = 2000;
+
+export const updateMembershipBodyCalendarPolicyMax = 1000;
+
+export const updateMembershipBodyChequePolicyMax = 1000;
+
+export const updateMembershipBodyDiscountPolicyMax = 1000;
+
+export const updateMembershipBodyRefundPolicyMax = 1000;
+
+
+
+export const UpdateMembershipBody = zod.object({
+  "year": zod.number().int().min(updateMembershipBodyYearMin).max(updateMembershipBodyYearMax),
+  "registrationUrl": zod.string().url().max(updateMembershipBodyRegistrationUrlMax),
+  "description": zod.string().min(1).max(updateMembershipBodyDescriptionMax),
+  "calendarPolicy": zod.string().min(1).max(updateMembershipBodyCalendarPolicyMax),
+  "chequePolicy": zod.string().min(1).max(updateMembershipBodyChequePolicyMax),
+  "discountPolicy": zod.string().min(1).max(updateMembershipBodyDiscountPolicyMax),
+  "refundPolicy": zod.string().min(1).max(updateMembershipBodyRefundPolicyMax)
+})
+
+export const updateMembershipResponseYearMin = 2000;
+export const updateMembershipResponseYearMax = 2200;
+
+export const updateMembershipResponseRegistrationUrlMax = 2000;
+
+export const updateMembershipResponseDescriptionMax = 2000;
+
+export const updateMembershipResponseCalendarPolicyMax = 1000;
+
+export const updateMembershipResponseChequePolicyMax = 1000;
+
+export const updateMembershipResponseDiscountPolicyMax = 1000;
+
+export const updateMembershipResponseRefundPolicyMax = 1000;
+
+
+
+export const UpdateMembershipResponse = zod.object({
+  "year": zod.number().int().min(updateMembershipResponseYearMin).max(updateMembershipResponseYearMax),
+  "registrationUrl": zod.string().url().max(updateMembershipResponseRegistrationUrlMax),
+  "description": zod.string().min(1).max(updateMembershipResponseDescriptionMax),
+  "calendarPolicy": zod.string().min(1).max(updateMembershipResponseCalendarPolicyMax),
+  "chequePolicy": zod.string().min(1).max(updateMembershipResponseChequePolicyMax),
+  "discountPolicy": zod.string().min(1).max(updateMembershipResponseDiscountPolicyMax),
+  "refundPolicy": zod.string().min(1).max(updateMembershipResponseRefundPolicyMax)
+})
+
+
 export const ListCommitteeResponseItem = zod.object({
   "id": zod.number().int(),
   "role": zod.string(),

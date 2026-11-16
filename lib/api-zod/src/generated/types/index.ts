@@ -14,3 +14,4 @@ export * from './contentPage';
 export * from './eventInput';
 export * from './eventInputCategory';
 export * from './healthStatus';
+export * from './membershipSettings';

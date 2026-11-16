@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { Show, useClerk } from "@clerk/react";
 import { Menu, X, LogOut, CalendarCog } from "lucide-react";
-import { CONTACT_EMAIL, ZEFFY_URL } from "@/lib/haas";
+import { CONTACT_EMAIL } from "@/lib/haas";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -81,9 +81,9 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               </Link>
               <SignOutButton />
             </Show>
-            <a href={ZEFFY_URL} target="_blank" rel="noreferrer" data-testid="link-join-header" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_6px_18px_-8px_hsl(var(--primary))] transition hover:-translate-y-0.5">
+            <Link href="/membership" data-testid="link-join-header" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_6px_18px_-8px_hsl(var(--primary))] transition hover:-translate-y-0.5">
               Become a member
-            </a>
+            </Link>
           </div>
           <button type="button" className="rounded-full p-2 lg:hidden" onClick={() => setOpen((o) => !o)} aria-label="Toggle menu" data-testid="button-menu">
             {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -100,7 +100,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <Link href="/admin" onClick={() => setOpen(false)} className="block py-3 font-display text-lg">Admin</Link>
               <SignOutButton />
             </Show>
-            <a href={ZEFFY_URL} target="_blank" rel="noreferrer" className="mt-4 block rounded-full bg-primary px-4 py-3 text-center font-semibold text-primary-foreground">Become a member</a>
+            <Link href="/membership" onClick={() => setOpen(false)} className="mt-4 block rounded-full bg-primary px-4 py-3 text-center font-semibold text-primary-foreground">Become a member</Link>
           </div>
         )}
       </header>

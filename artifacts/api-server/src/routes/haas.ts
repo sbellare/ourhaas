@@ -1,12 +1,13 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { db, eventsTable, committeeTable } from "@workspace/db";
+import { db, eventsTable, committeeTable, membershipTable } from "@workspace/db";
 import { asc, eq } from "drizzle-orm";
 import {
   ListEventsResponse, CreateEventBody, CreateEventResponse, UpdateEventParams,
   UpdateEventBody, UpdateEventResponse, DeleteEventParams,
   GetAdminStatusResponse, ListContentPagesResponse,
   ListCommitteeResponse, UpdateCommitteeMemberBody, UpdateCommitteeMemberParams, UpdateCommitteeMemberResponse,
+  GetMembershipResponse, UpdateMembershipBody, UpdateMembershipResponse,
 } from "@workspace/api-zod";
 import sourcePages from "../lib/source-content.json";
 
@@ -24,11 +25,11 @@ async function isAdmin(req: Request): Promise<boolean> {
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   if (!getAuth(req).userId) {
-    res.status(401).json({ error: "Please sign in to manage events." });
+    res.status(401).json({ error: "Please sign in to manage HAAS content." });
     return;
   }
   if (!(await isAdmin(req))) {
-    res.status(403).json({ error: "Only assigned HAAS administrators can modify events." });
+    res.status(403).json({ error: "Only assigned HAAS administrators can modify HAAS content." });
     return;
   }
   const origin = req.get("origin");
@@ -47,6 +48,33 @@ function validDate(value: string): boolean {
   const date = new Date(`${value}T12:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
+
+router.get("/haas/membership", async (_req, res): Promise<void> => {
+  const [membership] = await db.select().from(membershipTable).where(eq(membershipTable.id, 1));
+  if (!membership) { res.status(503).json({ error: "Membership information is not initialized." }); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.json(GetMembershipResponse.parse(membership));
+});
+router.put("/haas/membership", requireAdmin, async (req, res): Promise<void> => {
+  const parsed = UpdateMembershipBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: "Enter a valid year, registration URL, and all membership details." }); return; }
+  const data = parsed.data;
+  const fields = ["description", "calendarPolicy", "chequePolicy", "discountPolicy", "refundPolicy"] as const;
+  if (fields.some((field) => !data[field].trim() || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(data[field]))) {
+    res.status(400).json({ error: "Membership details must not be blank or contain invalid characters." }); return;
+  }
+  const url = new URL(data.registrationUrl);
+  if (url.protocol !== "https:" || !["zeffy.com", "www.zeffy.com"].includes(url.hostname) || url.username || url.password) {
+    res.status(400).json({ error: "Use a secure https://www.zeffy.com registration link." }); return;
+  }
+  const [saved] = await db.update(membershipTable).set({
+    ...data,
+    registrationUrl: url.href,
+    ...Object.fromEntries(fields.map((field) => [field, data[field].trim()])),
+  }).where(eq(membershipTable.id, 1)).returning();
+  if (!saved) { res.status(503).json({ error: "Membership information is not initialized." }); return; }
+  res.json(UpdateMembershipResponse.parse(saved));
+});
 
 router.get("/haas/pages", async (_req, res): Promise<void> => {
   const members = await db.select().from(committeeTable).orderBy(asc(committeeTable.position));

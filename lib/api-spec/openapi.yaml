@@ -11,6 +11,31 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /haas/membership:
+    get:
+      operationId: getMembership
+      responses:
+        "200":
+          description: Current public membership information
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipSettings" }
+    put:
+      operationId: updateMembership
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MembershipSettings" }
+      responses:
+        "200":
+          description: Saved membership information
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MembershipSettings" }
+        "400": { description: Invalid membership information }
+        "401": { description: Sign-in required }
+        "403": { description: Administrator required }
   /haas/committee:
     get:
       operationId: listCommittee
@@ -128,6 +153,18 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    MembershipSettings:
+      type: object
+      additionalProperties: false
+      required: [year, registrationUrl, description, calendarPolicy, chequePolicy, discountPolicy, refundPolicy]
+      properties:
+        year: { type: integer, minimum: 2000, maximum: 2200 }
+        registrationUrl: { type: string, format: uri, maxLength: 2000 }
+        description: { type: string, minLength: 1, maxLength: 2000 }
+        calendarPolicy: { type: string, minLength: 1, maxLength: 1000 }
+        chequePolicy: { type: string, minLength: 1, maxLength: 1000 }
+        discountPolicy: { type: string, minLength: 1, maxLength: 1000 }
+        refundPolicy: { type: string, minLength: 1, maxLength: 1000 }
     CommitteeMember:
       type: object
       required: [id, role, name]

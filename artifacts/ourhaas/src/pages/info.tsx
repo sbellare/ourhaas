@@ -1,39 +1,46 @@
 import { Link } from "wouter";
 import { ArrowUpRight, Mail, Landmark, CalendarRange, BadgePercent, Ban } from "lucide-react";
 import { PageHero } from "@/components/site-layout";
-import { CONTACT_EMAIL, ZEFFY_URL, initials } from "@/lib/haas";
-import { useListCommittee, getListCommitteeQueryKey, useGetAdminStatus } from "@workspace/api-client-react";
+import { CONTACT_EMAIL, initials } from "@/lib/haas";
+import { useListCommittee, getListCommitteeQueryKey, useGetAdminStatus, useGetMembership, getGetMembershipQueryKey } from "@workspace/api-client-react";
 import { LoadError } from "@/components/event-bits";
 
 export function Membership() {
+  const membership = useGetMembership({ query: { queryKey: getGetMembershipQueryKey(), refetchInterval: 30000 } });
+  const admin = useGetAdminStatus();
+  const details = membership.data;
   const rules = [
-    { icon: CalendarRange, title: "Calendar year", body: "Membership runs January 1 through December 31." },
-    { icon: Landmark, title: "Pay by cheque", body: "Prefer paper? Make cheques payable to HAAS." },
-    { icon: BadgePercent, title: "Partial year", body: "Partial-year discounts are available only with committee approval." },
-    { icon: Ban, title: "No refunds", body: "Membership fees are non-refundable." },
+    { icon: CalendarRange, title: "Membership period", body: details?.calendarPolicy },
+    { icon: Landmark, title: "Cheque payments", body: details?.chequePolicy },
+    { icon: BadgePercent, title: "Partial-year policy", body: details?.discountPolicy },
+    { icon: Ban, title: "Refund policy", body: details?.refundPolicy },
   ];
   return (
     <>
-      <PageHero eyebrow="Membership 2026" title={<>Be part of the <em className="font-normal text-primary">Samaj</em></>}>
-        Register online through our existing Zeffy page. Payment is handled by Zeffy; this site never collects card details.
+      <PageHero eyebrow={details ? `Membership ${details.year}` : "Membership"} title={<>Be part of the <em className="font-normal text-primary">Samaj</em></>}>
+        <span className="whitespace-pre-line">{details?.description}</span>
+        {admin.data?.isAdmin && <Link href="/admin#membership" className="mt-5 block text-sm font-semibold text-primary underline">Edit membership</Link>}
       </PageHero>
+      {membership.isLoading && <p role="status" className="mx-auto max-w-7xl px-5 py-14">Loading membership information…</p>}
+      {membership.isError && <div className="mx-auto max-w-7xl px-5 py-14"><LoadError what="membership information" onRetry={() => membership.refetch()} /></div>}
+      {details &&
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 md:grid-cols-[1.2fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-2">
           {rules.map((r) => (
             <div key={r.title} className="rounded-3xl border border-card-border bg-card p-6 transition hover:-translate-y-1">
               <r.icon className="h-6 w-6 text-primary" />
               <h3 className="font-display mt-4 text-2xl font-semibold">{r.title}</h3>
-              <p className="mt-2 text-muted-foreground">{r.body}</p>
+              <p className="mt-2 whitespace-pre-line text-muted-foreground">{r.body}</p>
             </div>
           ))}
         </div>
         <div className="sticky top-28 h-fit rounded-[2rem] bg-primary p-8 text-primary-foreground">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] opacity-80">HAAS 2026 Membership</p>
+          <p className="font-mono text-xs uppercase tracking-[0.2em] opacity-80">HAAS {details.year} Membership</p>
           <p className="font-display mt-3 text-4xl font-semibold leading-tight">Register on Zeffy</p>
-          <a href={ZEFFY_URL} target="_blank" rel="noreferrer" data-testid="link-zeffy" className="mt-8 inline-flex items-center gap-2 rounded-full bg-background px-6 py-3 font-semibold text-foreground transition hover:-translate-y-0.5">Open membership page <ArrowUpRight className="h-4 w-4" /></a>
+          <a href={details.registrationUrl} target="_blank" rel="noreferrer" data-testid="link-zeffy" className="mt-8 inline-flex items-center gap-2 rounded-full bg-background px-6 py-3 font-semibold text-foreground transition hover:-translate-y-0.5">Open membership page <ArrowUpRight className="h-4 w-4" /></a>
           <p className="mt-6 text-sm opacity-85">Questions about membership? <a className="underline" href={`mailto:${CONTACT_EMAIL}?subject=Membership`}>{CONTACT_EMAIL}</a></p>
         </div>
-      </div>
+      </div>}
     </>
   );
 }

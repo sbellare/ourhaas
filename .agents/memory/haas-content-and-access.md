@@ -13,4 +13,10 @@ The user selected one administrator account. Administrator access must require v
 
 **Why:** Event editing is restricted to administrators, and development and production have separate identities.
 
-**How to apply:** Preserve server-enforced authorization for event editing and committee-name editing. Keep a calendar date picker for events. Never add public self-promotion or a preview authentication bypass.
+**How to apply:** Preserve server-enforced authorization for event editing, committee-name editing, and membership-information editing. Keep a calendar date picker for events. Never add public self-promotion or a preview authentication bypass.
+
+Membership enrollment stays on Zeffy when making membership information editable.
+
+**Why:** The user asked for administrator editing of the existing membership section, not a replacement payment system.
+
+**How to apply:** Let the administrator change the year and Zeffy form link independently; changing a displayed year does not create a new enrollment form. Retain the existing payment destination until the administrator supplies a replacement.
