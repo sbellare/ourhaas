@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { COMMITTEE_TERM } from "@workspace/haas-content";
 import { ArrowUpRight, Mail, Landmark, CalendarRange, BadgePercent, Ban } from "lucide-react";
 import { PageHero } from "@/components/site-layout";
 import { CONTACT_EMAIL, initials } from "@/lib/haas";
@@ -54,7 +55,7 @@ export function About() {
         A community for Mangalorean Konkani families in the Houston area, bringing people of every generation together through bhajans, festivals and shared community life.
       </PageHero>
       <section className="mx-auto max-w-7xl px-5 py-14">
-        <h2 className="font-display text-4xl font-semibold">Committee Jan 2027 – Dec 2028</h2>
+        <h2 className="font-display text-4xl font-semibold">Committee {COMMITTEE_TERM}</h2>
         {admin.data?.isAdmin && <Link href="/admin#committee" className="mt-4 inline-block rounded-full border border-primary px-5 py-2 font-semibold text-primary">Edit committee names</Link>}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {committee.isLoading ? <p role="status">Loading committee…</p> : committee.isError ? <LoadError what="committee members" onRetry={() => committee.refetch()} /> : committee.data?.map((m, i) => (

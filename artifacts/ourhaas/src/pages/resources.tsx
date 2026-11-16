@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ArrowUpRight, FileText, Search } from "lucide-react";
-import { useListContentPages, type ContentPage } from "@workspace/api-client-react";
+import { useListContentPages, getListContentPagesQueryKey, type ContentPage } from "@workspace/api-client-react";
 import { PageHero } from "@/components/site-layout";
 import { LoadError } from "@/components/event-bits";
 
@@ -11,7 +11,7 @@ function excerpt(p: ContentPage) {
 }
 
 export function Resources() {
-  const pages = useListContentPages();
+  const pages = useListContentPages({ query: { queryKey: getListContentPagesQueryKey(), refetchInterval: 30000 } });
   const [q, setQ] = useState("");
   const list = useMemo(() => (pages.data ?? []).filter((p) => (p.title + p.markdown).toLowerCase().includes(q.toLowerCase())), [pages.data, q]);
 
@@ -59,7 +59,7 @@ function resolveHref(href: string | undefined, base: string) {
 
 export function ResourcePage() {
   const { slug } = useParams<{ slug: string }>();
-  const pages = useListContentPages();
+  const pages = useListContentPages({ query: { queryKey: getListContentPagesQueryKey(), refetchInterval: 30000 } });
   const page = pages.data?.find((p) => p.slug === slug);
 
   return (

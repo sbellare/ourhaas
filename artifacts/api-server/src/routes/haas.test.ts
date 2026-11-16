@@ -1,5 +1,7 @@
 import express from "express";
 import request from "supertest";
+import { COMMITTEE_RESOURCE_SLUG, COMMITTEE_TITLE } from "@workspace/haas-content";
+import sourcePages from "../lib/source-content.json";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 // Only the external identity and storage boundaries are replaced. Requests run
@@ -19,6 +21,7 @@ vi.mock("@clerk/express", () => ({
 vi.mock("@workspace/db", () => ({
   db: mocks,
   eventsTable: { id: "id", date: "date" },
+  committeeTable: { id: "id", position: "position" },
 }));
 import router from "./haas";
 
@@ -56,6 +59,63 @@ beforeEach(() => {
   mocks.userId = null;
 });
 afterEach(() => vi.unstubAllEnvs());
+
+describe("current committee resource", () => {
+  const roster = [
+    { id: 1, role: "President", name: "Sachin Bellare" },
+    { id: 2, role: "Secretary", name: "Sheetal Sashital" },
+    { id: 3, role: "Vice President", name: "Prateek Karkal" },
+    { id: 4, role: "Food", name: "Varun Chadarvarkar" },
+    { id: 5, role: "Treasurer", name: "Rupa Rao Dominitz" },
+    { id: 6, role: "Events", name: "Mahesh Sashital" },
+  ];
+
+  it("uses the same live ordered members as the public roster, preserving other resources and attribution", async () => {
+    let members = structuredClone(roster);
+    mocks.select.mockImplementation(() => ({
+      from: () => ({ orderBy: async () => members }),
+    }));
+    const verify = async () => {
+      const committee = await request(app).get("/haas/committee");
+      const pages = await request(app).get("/haas/pages");
+      expect(committee.status).toBe(200);
+      expect(pages.status).toBe(200);
+      expect(pages.headers["cache-control"]).toBe("no-store");
+      expect(committee.body).toEqual(members);
+      expect(pages.body.map((page: { slug: string }) => page.slug)).toEqual(sourcePages.map((page) => page.slug));
+      const page = pages.body.find((page: { slug: string }) => page.slug === COMMITTEE_RESOURCE_SLUG);
+      expect(page.title).toBe(COMMITTEE_TITLE);
+      expect(page.sourceUrl).toBe("https://www.ourhaas.com/present-haas-committee/");
+      expect(page.markdown).toBe(`# ${COMMITTEE_TITLE}\n\n_**Management Committee**_\n\n` +
+        members.map((member) => `**${member.role}** — ${member.name}`).join("\n\n") +
+        "\n\n[Contact the HAAS committee](mailto:ourhaas@gmail.com).");
+      expect(pages.body.filter((page: { slug: string }) => page.slug !== COMMITTEE_RESOURCE_SLUG))
+        .toEqual(sourcePages.filter((page) => page.slug !== COMMITTEE_RESOURCE_SLUG));
+    };
+    await verify();
+    // A subsequent read must use changed storage, not a source snapshot.
+    members = members.map((member) => member.id === 5 ? { ...member, name: "Updated treasurer" } : member);
+    members.push({ id: 7, role: "Volunteer", name: "New member" });
+    await verify();
+  });
+
+  it("escapes member names and roles so stored text cannot become markdown links or HTML", async () => {
+    mocks.select.mockReturnValue({
+      from: () => ({ orderBy: async () => [{ id: 1, role: "*Lead*", name: "[Name](https://example.com) <b>Test</b>" }] }),
+    });
+    const response = await request(app).get("/haas/pages");
+    expect(response.status).toBe(200);
+    const page = response.body.find((page: { slug: string }) => page.slug === COMMITTEE_RESOURCE_SLUG);
+    expect(page.markdown).toContain("**\\*Lead\\*** — \\[Name\\]\\(https://example\\.com\\) \\<b\\>Test\\</b\\>");
+  });
+
+  it("reports storage failure rather than serving an obsolete source roster", async () => {
+    mocks.select.mockImplementation(() => { throw new Error("Unavailable"); });
+    const response = await request(app).get("/haas/pages");
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Request failed" });
+  });
+});
 
 describe("assigned administrator authorization", () => {
   it("reports a signed-out account without looking up a user", async () => {

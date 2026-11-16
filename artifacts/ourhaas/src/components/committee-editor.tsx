@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { COMMITTEE_TERM } from "@workspace/haas-content";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListCommittee, useUpdateCommitteeMember,
@@ -21,7 +22,7 @@ export function CommitteeEditor() {
   return (
     <section id="committee" className="mb-14 scroll-mt-28 rounded-3xl border border-card-border bg-card p-5 sm:p-8">
       <h2 className="font-display text-3xl font-semibold">Committee members</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Jan 2027 – Dec 2028. Edit a name below; saved changes appear across the website. Roles and term dates stay unchanged.</p>
+      <p className="mt-2 text-sm text-muted-foreground">{COMMITTEE_TERM}. Edit a name below; saved changes appear across the website. Roles and term dates stay unchanged.</p>
       {members.isLoading ? <p className="mt-6" role="status">Loading committee…</p> :
         members.isError ? <LoadError what="committee members" onRetry={() => members.refetch()} /> :
         <div className="mt-6 divide-y divide-border">

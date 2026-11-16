@@ -10,6 +10,7 @@ import {
   GetMembershipResponse, UpdateMembershipBody, UpdateMembershipResponse,
 } from "@workspace/api-zod";
 import sourcePages from "../lib/source-content.json";
+import { COMMITTEE_RESOURCE_SLUG, COMMITTEE_TITLE } from "@workspace/haas-content";
 
 const router: IRouter = Router();
 
@@ -79,11 +80,12 @@ router.put("/haas/membership", requireAdmin, async (req, res): Promise<void> => 
 router.get("/haas/pages", async (_req, res): Promise<void> => {
   const members = await db.select().from(committeeTable).orderBy(asc(committeeTable.position));
   const escape = (value: string) => value.replace(/[\\`*_{}\[\]()#+.!<>|~-]/g, "\\$&");
-  const pages = sourcePages.map((page) => page.slug !== "present-haas-committee" ? page : {
+  const pages = sourcePages.map((page) => page.slug !== COMMITTEE_RESOURCE_SLUG ? page : {
     ...page,
-    markdown: "# HAAS Committee Jan 2027 - Dec 2028\n\n" +
+    title: COMMITTEE_TITLE,
+    markdown: `# ${COMMITTEE_TITLE}\n\n_**Management Committee**_\n\n` +
       members.map((member) => `**${escape(member.role)}** — ${escape(member.name)}`).join("\n\n") +
-      "\n\n[Contact the HAAS committee](mailto:ourhaas@gmail.com).",
+      `\n\n${page.markdown}`,
   });
   res.setHeader("Cache-Control", "no-store");
   res.json(ListContentPagesResponse.parse(pages));
