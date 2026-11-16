@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CommunityEvent } from "@workspace/api-client-react";
+import { getListEventsQueryKey, type CommunityEvent } from "@workspace/api-client-react";
 import Events from "./events";
 
 vi.mock("@/components/site-layout", () => ({
@@ -17,7 +17,13 @@ let rows: CommunityEvent[];
 
 function mount() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(<QueryClientProvider client={client}><Events /></QueryClientProvider>);
+  return { ...render(<QueryClientProvider client={client}><Events /></QueryClientProvider>), client };
+}
+
+async function refreshEvents(client: QueryClient) {
+  await act(async () => {
+    await client.refetchQueries({ queryKey: getListEventsQueryKey() });
+  });
 }
 
 beforeEach(() => {
@@ -30,6 +36,78 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+describe("open event details after a refresh", () => {
+  it.each(["list", "calendar"] as const)("updates all details opened from the %s without resetting the calendar month", async (view) => {
+    const { client } = mount();
+    await screen.findByTestId("card-event-2");
+    if (view === "calendar") {
+      await userEvent.click(screen.getByTestId("button-view-calendar"));
+      await userEvent.click(screen.getByRole("button", { name: "Previous month" }));
+      expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+    }
+    await userEvent.click(screen.getByTestId(view === "calendar" ? "button-cal-event-2" : "card-event-2"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Gathering 2031-12-31");
+
+    rows = rows.map((row) => row.id === 2 ? {
+      ...row, title: "Updated gathering", date: "2032-03-15", time: "6:30 PM",
+      location: "New community hall", category: "Spiritual", description: "Please use the new entrance.",
+    } : row);
+    await refreshEvents(client);
+
+    await screen.findByRole("heading", { name: "Updated gathering" });
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("heading", { name: "Updated gathering" })).toBeVisible();
+    expect(dialog.getByText("Monday, March 15, 2032")).toBeVisible();
+    expect(dialog.getByText("6:30 PM")).toBeVisible();
+    expect(dialog.getByText("New community hall")).toBeVisible();
+    expect(dialog.getByText("Spiritual")).toBeVisible();
+    expect(dialog.getByText("Please use the new entrance.")).toBeVisible();
+    expect(dialog.getByRole("link")).toHaveAttribute("href", expect.stringContaining("subject=Updated%20gathering"));
+    expect(dialog.queryByText("Gathering 2031-12-31")).not.toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Close" }));
+    if (view === "calendar") {
+      expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+      expect(screen.queryByTestId("button-cal-event-2")).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByTestId("card-event-2")).toHaveTextContent("Updated gathering");
+    }
+  });
+
+  it.each(["list", "calendar"] as const)("closes deleted details opened from the %s without resetting the calendar month", async (view) => {
+    const { client } = mount();
+    await screen.findByTestId("card-event-2");
+    if (view === "calendar") {
+      await userEvent.click(screen.getByTestId("button-view-calendar"));
+      await userEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    }
+    await userEvent.click(screen.getByTestId(view === "calendar" ? "button-cal-event-2" : "card-event-2"));
+    expect(screen.getByRole("dialog")).toBeVisible();
+    const previousRows = rows;
+    rows = [];
+    await refreshEvents(client);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    if (view === "calendar") {
+      expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+      expect(screen.queryByTestId("button-cal-event-2")).not.toBeInTheDocument();
+    } else {
+      expect(screen.queryByTestId("card-event-2")).not.toBeInTheDocument();
+      expect(screen.getByTestId("empty-upcoming")).toBeVisible();
+    }
+
+    // A later response must not reopen a selection that deletion already cleared.
+    rows = previousRows;
+    await refreshEvents(client);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    if (view === "calendar") {
+      expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+      await userEvent.click(await screen.findByTestId("button-cal-event-2"));
+    } else {
+      await userEvent.click(await screen.findByTestId("card-event-2"));
+    }
+    expect(screen.getByRole("dialog")).toHaveTextContent("Gathering 2031-12-31");
+  });
+});
 describe("public event dates", () => {
   it("orders past and upcoming sections across New Year, including today as upcoming", async () => {
     mount();

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addMonths, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, eachDayOfInterval, subMonths } from "date-fns";
 import { ChevronLeft, ChevronRight, LayoutList, CalendarDays } from "lucide-react";
 import { useListEvents, getListEventsQueryKey, type CommunityEvent } from "@workspace/api-client-react";
@@ -57,8 +57,17 @@ function MonthGrid({ events, onOpen }: { events: CommunityEvent[]; onOpen: (e: C
 export default function Events() {
   const events = useListEvents({ query: { queryKey: getListEventsQueryKey(), refetchInterval: 30000 } });
   const [view, setView] = useState<"list" | "calendar">("list");
-  const [open, setOpen] = useState<CommunityEvent | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<CommunityEvent["id"] | null>(null);
+  const openEvent = events.data?.find((event) => event.id === selectedEventId) ?? null;
+  const openEventDetails = (event: CommunityEvent) => setSelectedEventId(event.id);
   const { upcoming, past } = splitEvents(events.data);
+
+  useEffect(() => {
+    // Only a successful refresh can confirm deletion, not a temporary loading error.
+    if (events.isSuccess && selectedEventId !== null && !openEvent) {
+      setSelectedEventId(null);
+    }
+  }, [events.isSuccess, selectedEventId, openEvent]);
 
   return (
     <>
@@ -75,24 +84,24 @@ export default function Events() {
         </div>
         <div className="mt-8">
           {events.isLoading ? <EventSkeleton /> : events.isError ? <LoadError what="events" onRetry={() => events.refetch()} /> : view === "calendar" ? (
-            <MonthGrid events={events.data ?? []} onOpen={setOpen} />
+            <MonthGrid events={events.data ?? []} onOpen={openEventDetails} />
           ) : (
             <div className="space-y-16">
               <section>
                 <h2 className="font-display text-3xl font-semibold">Upcoming</h2>
-                <div className="mt-5 space-y-3">{upcoming.length === 0 ? <UpcomingEmpty /> : upcoming.map((e) => <EventRow key={e.id} event={e} onOpen={setOpen} />)}</div>
+                <div className="mt-5 space-y-3">{upcoming.length === 0 ? <UpcomingEmpty /> : upcoming.map((e) => <EventRow key={e.id} event={e} onOpen={openEventDetails} />)}</div>
               </section>
               <section>
                 <h2 className="font-display text-3xl font-semibold">Past events</h2>
                 <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  {past.length === 0 ? <p className="text-muted-foreground">No past events recorded yet.</p> : past.map((e) => <EventRow key={e.id} event={e} past onOpen={setOpen} />)}
+                  {past.length === 0 ? <p className="text-muted-foreground">No past events recorded yet.</p> : past.map((e) => <EventRow key={e.id} event={e} past onOpen={openEventDetails} />)}
                 </div>
               </section>
             </div>
           )}
         </div>
       </div>
-      <EventDialog event={open} onClose={() => setOpen(null)} />
+      <EventDialog event={openEvent} onClose={() => setSelectedEventId(null)} />
     </>
   );
 }
