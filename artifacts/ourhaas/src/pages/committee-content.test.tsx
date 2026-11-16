@@ -23,6 +23,25 @@ const originalMembers = [
 ];
 let members: typeof originalMembers;
 
+const committeePages = [
+  {
+    destination: "homepage", path: "/", element: <Home />, testId: "card-committee-",
+    gridClasses: ["grid", "grid-cols-2", "md:grid-cols-3", "lg:grid-cols-6"],
+  },
+  {
+    destination: "About page", path: "/about", element: <About />, testId: "card-member-",
+    gridClasses: ["grid", "sm:grid-cols-2", "lg:grid-cols-3"],
+  },
+];
+
+function mountCommitteePage(path: string, element: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  const location = memoryLocation({ path });
+  return render(<QueryClientProvider client={client}><Router hook={location.hook}>
+    <Route path={path}>{element}</Route>
+  </Router></QueryClientProvider>);
+}
+
 beforeEach(() => {
   members = structuredClone(originalMembers);
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
@@ -38,6 +57,69 @@ beforeEach(() => {
     }]);
     throw new Error(`Unexpected request: ${url}`);
   }));
+});
+
+describe("committee layout regression", () => {
+  // jsdom does not calculate layout. Assert the production Tailwind contract
+  // instead of pretending that changing window.innerWidth measures clipping.
+  // Phone (320–390px): Home 2 columns, About 1; desktop (1280px): Home 6, About 3.
+  // Run: pnpm --filter @workspace/ourhaas exec vitest run src/pages/committee-content.test.tsx
+  it.each(committeePages)(
+    "keeps six unique role/name pairs in the phone and desktop grid on the $destination",
+    async ({ path, element, testId, gridClasses }) => {
+      mountCommitteePage(path, element);
+      await screen.findByText("Rupa Rao Dominitz");
+
+      const cards = screen.getAllByTestId(new RegExp(`^${testId}\\d+$`));
+      expect(cards).toHaveLength(6);
+      const grid = cards[0].parentElement!;
+      expect(grid).toHaveClass(...gridClasses);
+      if (path === "/about") {
+        // No unprefixed column utility: About stays single-column on phones.
+        expect([...grid.classList].filter((token) => /^grid-cols-/.test(token))).toEqual([]);
+      }
+
+      const renderedPairs = cards.map((card) => {
+        const labels = card.querySelectorAll("p");
+        expect(labels).toHaveLength(2);
+        expect(card.querySelector("img, picture")).not.toBeInTheDocument();
+        return { role: labels[0].textContent, name: labels[1].textContent };
+      });
+      expect(new Set(renderedPairs.map((pair) => pair.name)).size).toBe(6);
+      expect(new Set(renderedPairs.map((pair) => pair.role)).size).toBe(6);
+      expect(renderedPairs).toEqual(originalMembers.map(({ role, name }) => ({ role, name })));
+    },
+  );
+
+  it.each(committeePages)(
+    "preserves shrink and wrapping safeguards for long names on the $destination",
+    async ({ path, element, testId }) => {
+      mountCommitteePage(path, element);
+      await screen.findByText("Varun Chadarvarkar");
+
+      for (const member of originalMembers) {
+        const name = screen.getByText(member.name, { exact: true });
+        const card = name.closest<HTMLElement>(`[data-testid^="${testId}"]`)!;
+        expect(card).not.toBeNull();
+        expect(name).toHaveClass("break-words");
+        expect(name.closest(".min-w-0")).not.toBeNull();
+        if (path === "/") {
+          expect(card).toHaveClass("min-w-0");
+        } else {
+          expect(name.parentElement).toHaveClass("min-w-0");
+          expect(card).toHaveClass("flex");
+          expect(card.firstElementChild).toHaveClass("shrink-0");
+        }
+        // A wrapping name can still be cut off by its card, grid or section.
+        for (let node: HTMLElement | null = name; node; node = node.parentElement) {
+          expect([...node.classList].filter((token) =>
+            /^(?:(?:sm|md|lg|xl|2xl):)*(?:truncate|whitespace-nowrap|text-ellipsis|line-clamp-.+|overflow(?:-[xy])?-(?:hidden|clip)|(?:max-)?h-.+)$/.test(token),
+          )).toEqual([]);
+          if (node.tagName === "SECTION") break;
+        }
+      }
+    },
+  );
 });
 
 describe("committee destinations", () => {
