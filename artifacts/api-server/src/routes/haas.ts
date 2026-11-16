@@ -1,11 +1,12 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { db, eventsTable } from "@workspace/db";
+import { db, eventsTable, committeeTable } from "@workspace/db";
 import { asc, eq } from "drizzle-orm";
 import {
   ListEventsResponse, CreateEventBody, CreateEventResponse, UpdateEventParams,
   UpdateEventBody, UpdateEventResponse, DeleteEventParams,
   GetAdminStatusResponse, ListContentPagesResponse,
+  ListCommitteeResponse, UpdateCommitteeMemberBody, UpdateCommitteeMemberParams, UpdateCommitteeMemberResponse,
 } from "@workspace/api-zod";
 import sourcePages from "../lib/source-content.json";
 
@@ -47,8 +48,33 @@ function validDate(value: string): boolean {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-router.get("/haas/pages", (_req, res) => {
-  res.json(ListContentPagesResponse.parse(sourcePages));
+router.get("/haas/pages", async (_req, res): Promise<void> => {
+  const members = await db.select().from(committeeTable).orderBy(asc(committeeTable.position));
+  const escape = (value: string) => value.replace(/[\\`*_{}\[\]()#+.!<>|~-]/g, "\\$&");
+  const pages = sourcePages.map((page) => page.slug !== "present-haas-committee" ? page : {
+    ...page,
+    markdown: "# HAAS Committee Jan 2027 - Dec 2028\n\n" +
+      members.map((member) => `**${escape(member.role)}** — ${escape(member.name)}`).join("\n\n") +
+      "\n\n[Contact the HAAS committee](mailto:ourhaas@gmail.com).",
+  });
+  res.setHeader("Cache-Control", "no-store");
+  res.json(ListContentPagesResponse.parse(pages));
+});
+router.get("/haas/committee", async (_req, res): Promise<void> => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(ListCommitteeResponse.parse(await db.select().from(committeeTable).orderBy(asc(committeeTable.position))));
+});
+router.patch("/haas/committee/:id", requireAdmin, async (req, res): Promise<void> => {
+  const params = UpdateCommitteeMemberParams.safeParse(req.params);
+  const parsed = UpdateCommitteeMemberBody.safeParse(req.body);
+  if (!params.success || !parsed.success || !parsed.data.name.trim() || /[\u0000-\u001f\u007f]/.test(parsed.data.name)) {
+    res.status(400).json({ error: "Enter a member name between 1 and 120 characters." });
+    return;
+  }
+  const [member] = await db.update(committeeTable).set({ name: parsed.data.name.trim() })
+    .where(eq(committeeTable.id, params.data.id)).returning();
+  if (!member) { res.status(404).json({ error: "Committee member not found." }); return; }
+  res.json(UpdateCommitteeMemberResponse.parse(member));
 });
 router.get("/haas/admin", async (req, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");

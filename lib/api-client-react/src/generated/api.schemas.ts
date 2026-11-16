@@ -5,6 +5,21 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface CommitteeMember {
+  id: number;
+  role: string;
+  name: string;
+}
+
+export interface CommitteeMemberUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     * @pattern ^[^\r\n]+$
+     */
+  name: string;
+}
+
 export type EventInputCategory = typeof EventInputCategory[keyof typeof EventInputCategory];
 
 

@@ -7,6 +7,8 @@
  */
 
 export * from './adminStatus';
+export * from './committeeMember';
+export * from './committeeMemberUpdate';
 export * from './communityEvent';
 export * from './contentPage';
 export * from './eventInput';

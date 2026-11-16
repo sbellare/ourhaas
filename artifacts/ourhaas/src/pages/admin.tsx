@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { CategoryChip, DateBlock, EventSkeleton, LoadError } from "@/components/event-bits";
 import { parseDay, splitEvents, toDay } from "@/lib/haas";
+import { CommitteeEditor } from "@/components/committee-editor";
 
 const schema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200),
@@ -146,6 +147,7 @@ function Manager() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-12">
+      <CommitteeEditor />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.25em] text-primary">Event admin</p>
@@ -221,14 +223,14 @@ export default function Admin() {
   if (!status.data?.signedIn)
     return (
       <Notice title="Committee sign in">
-        <p>Event management is for the HAAS administrator. Sign in with the assigned HAAS admin email address.</p>
+        <p>Committee and event management are for the HAAS administrator. Sign in with the assigned HAAS admin email address.</p>
         <Link href="/sign-in" data-testid="link-admin-signin" className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 font-semibold text-primary-foreground"><LogIn className="h-4 w-4" /> Sign in</Link>
       </Notice>
     );
   if (!status.data.isAdmin)
     return (
       <Notice title="Access restricted">
-        <p>This account doesn't have event admin access. Only the assigned HAAS admin email, once verified, can edit events.</p>
+        <p>This account doesn't have admin access. Only the assigned HAAS admin email, once verified, can edit committee names and events.</p>
         <Link href="/events" className="mt-6 inline-block text-primary underline">View public events</Link>
       </Notice>
     );

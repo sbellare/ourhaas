@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, ArrowUpRight, Mail } from "lucide-react";
-import { useListEvents, useListContentPages, getListEventsQueryKey, type CommunityEvent } from "@workspace/api-client-react";
+import { useListEvents, useListContentPages, useListCommittee, getListCommitteeQueryKey, getListEventsQueryKey, type CommunityEvent } from "@workspace/api-client-react";
 import { EventDialog, EventRow, EventSkeleton, LoadError, UpcomingEmpty } from "@/components/event-bits";
-import { COMMITTEE, CONTACT_EMAIL, ZEFFY_URL, initials, splitEvents } from "@/lib/haas";
+import { CONTACT_EMAIL, ZEFFY_URL, initials, splitEvents } from "@/lib/haas";
 
 const heroImg = `${import.meta.env.BASE_URL}hero-coast.jpg`;
 
 export default function Home() {
   const events = useListEvents({ query: { queryKey: getListEventsQueryKey(), refetchInterval: 30000 } });
   const pages = useListContentPages();
+  const committee = useListCommittee({ query: { queryKey: getListCommitteeQueryKey(), refetchInterval: 30000 } });
   const [open, setOpen] = useState<CommunityEvent | null>(null);
   const { upcoming, past } = splitEvents(events.data);
 
@@ -100,11 +101,11 @@ export default function Home() {
         <p className="font-mono text-xs uppercase tracking-[0.25em] text-primary">Committee Jan 2027 – Dec 2028</p>
         <h2 className="font-display mt-2 text-4xl font-semibold md:text-5xl">The people keeping the lamp lit</h2>
         <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {COMMITTEE.map((m, i) => (
-            <div key={m.name} className="group rounded-3xl border border-card-border bg-card p-5 transition hover:-translate-y-1" data-testid={`card-committee-${i}`}>
+          {committee.isLoading ? <p role="status">Loading committee…</p> : committee.isError ? <LoadError what="committee members" onRetry={() => committee.refetch()} /> : committee.data?.map((m, i) => (
+            <div key={m.id} className="group min-w-0 rounded-3xl border border-card-border bg-card p-5 transition hover:-translate-y-1" data-testid={`card-committee-${i}`}>
               <div className={`flex h-14 w-14 items-center justify-center rounded-full font-display text-xl font-semibold transition group-hover:rotate-6 ${i % 3 === 0 ? "bg-primary text-primary-foreground" : i % 3 === 1 ? "bg-secondary text-secondary-foreground" : "bg-accent text-accent-foreground"}`}>{initials(m.name)}</div>
               <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{m.role}</p>
-              <p className="font-display text-lg font-semibold leading-tight">{m.name}</p>
+              <p className="font-display break-words text-lg font-semibold leading-tight">{m.name}</p>
             </div>
           ))}
         </div>

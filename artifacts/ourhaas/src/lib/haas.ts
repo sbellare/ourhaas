@@ -32,13 +32,6 @@ export const CATEGORY_STYLE: Record<string, { dot: string; chip: string; label: 
 export const CONTACT_EMAIL = "ourhaas@gmail.com";
 export const ZEFFY_URL = "https://www.zeffy.com/en-US/ticketing/haas-2026-membership";
 
-export const COMMITTEE = [
-  { role: "President", name: "Sachin Bellare" },
-  { role: "Secretary", name: "Sheetal Sashital" },
-  { role: "Vice President", name: "Prateek Karkal" },
-  { role: "Food", name: "Varun Chadarvarkar" },
-];
-
 export function initials(name: string) {
   return name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }

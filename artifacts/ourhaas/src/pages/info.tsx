@@ -1,7 +1,9 @@
 import { Link } from "wouter";
 import { ArrowUpRight, Mail, Landmark, CalendarRange, BadgePercent, Ban } from "lucide-react";
 import { PageHero } from "@/components/site-layout";
-import { COMMITTEE, CONTACT_EMAIL, ZEFFY_URL, initials } from "@/lib/haas";
+import { CONTACT_EMAIL, ZEFFY_URL, initials } from "@/lib/haas";
+import { useListCommittee, getListCommitteeQueryKey, useGetAdminStatus } from "@workspace/api-client-react";
+import { LoadError } from "@/components/event-bits";
 
 export function Membership() {
   const rules = [
@@ -37,6 +39,8 @@ export function Membership() {
 }
 
 export function About() {
+  const committee = useListCommittee({ query: { queryKey: getListCommitteeQueryKey(), refetchInterval: 30000 } });
+  const admin = useGetAdminStatus();
   return (
     <>
       <PageHero eyebrow="About HAAS" title={<>Houston Area <em className="font-normal text-primary">Amchigele</em> Samaj</>}>
@@ -44,13 +48,14 @@ export function About() {
       </PageHero>
       <section className="mx-auto max-w-7xl px-5 py-14">
         <h2 className="font-display text-4xl font-semibold">Committee Jan 2027 – Dec 2028</h2>
+        {admin.data?.isAdmin && <Link href="/admin#committee" className="mt-4 inline-block rounded-full border border-primary px-5 py-2 font-semibold text-primary">Edit committee names</Link>}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {COMMITTEE.map((m, i) => (
-            <div key={m.name} className="flex items-center gap-5 rounded-3xl border border-card-border bg-card p-5" data-testid={`card-member-${i}`}>
+          {committee.isLoading ? <p role="status">Loading committee…</p> : committee.isError ? <LoadError what="committee members" onRetry={() => committee.refetch()} /> : committee.data?.map((m, i) => (
+            <div key={m.id} className="flex items-center gap-5 rounded-3xl border border-card-border bg-card p-5" data-testid={`card-member-${i}`}>
               <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl font-display text-2xl font-semibold ${i % 2 ? "bg-secondary text-secondary-foreground" : "bg-primary text-primary-foreground"}`}>{initials(m.name)}</div>
-              <div>
+              <div className="min-w-0">
                 <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{m.role}</p>
-                <p className="font-display text-xl font-semibold">{m.name}</p>
+                <p className="font-display break-words text-xl font-semibold">{m.name}</p>
               </div>
             </div>
           ))}

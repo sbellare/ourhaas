@@ -8,6 +8,38 @@
 import * as zod from 'zod';
 
 
+export const ListCommitteeResponseItem = zod.object({
+  "id": zod.number().int(),
+  "role": zod.string(),
+  "name": zod.string()
+})
+export const ListCommitteeResponse = zod.array(ListCommitteeResponseItem)
+
+
+
+
+
+export const UpdateCommitteeMemberParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const updateCommitteeMemberBodyNameMax = 120;
+
+
+export const updateCommitteeMemberBodyNameRegExp = new RegExp('^[^\\r\\n]+$');
+
+
+export const UpdateCommitteeMemberBody = zod.object({
+  "name": zod.string().min(1).max(updateCommitteeMemberBodyNameMax).regex(updateCommitteeMemberBodyNameRegExp)
+})
+
+export const UpdateCommitteeMemberResponse = zod.object({
+  "id": zod.number().int(),
+  "role": zod.string(),
+  "name": zod.string()
+})
+
+
 export const listEventsResponseOneTitleMax = 200;
 
 export const listEventsResponseOneDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');

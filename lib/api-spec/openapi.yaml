@@ -11,6 +11,40 @@ tags:
   - name: health
     description: Health operations
 paths:
+  /haas/committee:
+    get:
+      operationId: listCommittee
+      responses:
+        "200":
+          description: Current committee roster in display order
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CommitteeMember" }
+  /haas/committee/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    patch:
+      operationId: updateCommitteeMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommitteeMemberUpdate" }
+      responses:
+        "200":
+          description: Saved committee member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommitteeMember" }
+        "400": { description: Invalid name or identifier }
+        "401": { description: Sign-in required }
+        "403": { description: Administrator required }
+        "404": { description: Member not found }
   /haas/events:
     get:
       operationId: listEvents
@@ -94,6 +128,19 @@ paths:
                 $ref: "#/components/schemas/HealthStatus"
 components:
   schemas:
+    CommitteeMember:
+      type: object
+      required: [id, role, name]
+      properties:
+        id: { type: integer }
+        role: { type: string }
+        name: { type: string }
+    CommitteeMemberUpdate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120, pattern: '^[^\r\n]+$' }
     EventInput:
       type: object
       required: [title, date, time, location, description, category]

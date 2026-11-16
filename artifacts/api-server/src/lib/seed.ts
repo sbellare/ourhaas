@@ -1,8 +1,16 @@
-import { db, eventsTable, setupTable } from "@workspace/db";
+import { db, eventsTable, setupTable, committeeTable } from "@workspace/db";
 
 // Data-only initialization works in both environments, without schema changes
 // at startup. The marker prevents deleted or edited source events reappearing.
 export async function seedSourceEvents(): Promise<void> {
+  await db.insert(committeeTable).values([
+    { role: "President", name: "Sachin Bellare", position: 0 },
+    { role: "Secretary", name: "Sheetal Sashital", position: 1 },
+    { role: "Vice President", name: "Prateek Karkal", position: 2 },
+    { role: "Food", name: "Varun Chadarvarkar", position: 3 },
+    { role: "Treasurer", name: "Rupa Rao Dominitz", position: 4 },
+    { role: "Events", name: "Mahesh Sashital", position: 5 },
+  ]).onConflictDoNothing({ target: committeeTable.role });
   await db.transaction(async (tx) => {
     const initialized = await tx.insert(setupTable)
       .values({ key: "original-source-events" }).onConflictDoNothing().returning();

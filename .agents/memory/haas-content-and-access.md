@@ -13,4 +13,4 @@ The user selected one administrator account. Administrator access must require v
 
 **Why:** Event editing is restricted to administrators, and development and production have separate identities.
 
-**How to apply:** Preserve server-enforced authorization and a calendar date picker for event editing. Never add public self-promotion or a preview authentication bypass.
+**How to apply:** Preserve server-enforced authorization for event editing and committee-name editing. Keep a calendar date picker for events. Never add public self-promotion or a preview authentication bypass.
