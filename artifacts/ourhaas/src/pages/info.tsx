@@ -43,7 +43,7 @@ export function About() {
         A community for Mangalorean Konkani families in the Houston area, bringing people of every generation together through bhajans, festivals and shared community life.
       </PageHero>
       <section className="mx-auto max-w-7xl px-5 py-14">
-        <h2 className="font-display text-4xl font-semibold">Committee 2025 – 2026</h2>
+        <h2 className="font-display text-4xl font-semibold">Committee Jan 2027 – Dec 2028</h2>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {COMMITTEE.map((m, i) => (
             <div key={m.name} className="flex items-center gap-5 rounded-3xl border border-card-border bg-card p-5" data-testid={`card-member-${i}`}>

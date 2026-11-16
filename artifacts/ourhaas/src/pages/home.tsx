@@ -97,7 +97,7 @@ export default function Home() {
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-20">
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-primary">Committee 2025 – 2026</p>
+        <p className="font-mono text-xs uppercase tracking-[0.25em] text-primary">Committee Jan 2027 – Dec 2028</p>
         <h2 className="font-display mt-2 text-4xl font-semibold md:text-5xl">The people keeping the lamp lit</h2>
         <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
           {COMMITTEE.map((m, i) => (

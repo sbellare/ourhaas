@@ -33,12 +33,10 @@ export const CONTACT_EMAIL = "ourhaas@gmail.com";
 export const ZEFFY_URL = "https://www.zeffy.com/en-US/ticketing/haas-2026-membership";
 
 export const COMMITTEE = [
-  { role: "President", name: "Mahesh Nagarkatti" },
-  { role: "Vice President", name: "Sachin Bellare" },
-  { role: "Secretary", name: "Keerthi Shenoy" },
-  { role: "Treasurer", name: "Prateek Karkal" },
-  { role: "Events", name: "Mahesh Sashital" },
-  { role: "Food", name: "Arundhati Bijoor" },
+  { role: "President", name: "Sachin Bellare" },
+  { role: "Secretary", name: "Sheetal Sashital" },
+  { role: "Vice President", name: "Prateek Karkal" },
+  { role: "Food", name: "Varun Chadarvarkar" },
 ];
 
 export function initials(name: string) {
