@@ -16,7 +16,7 @@ for (const zone of zones) {
   console.log(`\n=== Event date regressions: ${zone} ===`);
   for (const [workspace, files] of [
     ["api-server", ["src/routes/haas.test.ts"]],
-    ["ourhaas", ["src/lib/haas.test.ts", "src/pages/events.test.tsx", "src/pages/admin.test.tsx"]],
+    ["ourhaas", ["src/lib/haas.test.ts", "src/lib/event-form.test.ts", "src/pages/events.test.tsx", "src/pages/admin.test.tsx"]],
   ]) {
     const result = spawnSync("pnpm", [
       "--filter", `@workspace/${workspace}`, "exec", "vitest", "run",

@@ -45,11 +45,6 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction): Pr
   next();
 }
 
-function validDate(value: string): boolean {
-  const date = new Date(`${value}T12:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
 router.get("/haas/membership", async (_req, res): Promise<void> => {
   const [membership] = await db.select().from(membershipTable).where(eq(membershipTable.id, 1));
   if (!membership) { res.status(503).json({ error: "Membership information is not initialized." }); return; }
@@ -116,7 +111,7 @@ router.get("/haas/events", async (_req, res): Promise<void> => {
 });
 router.post("/haas/events", requireAdmin, async (req, res): Promise<void> => {
   const parsed = CreateEventBody.safeParse(req.body);
-  if (!parsed.success || !parsed.data.title.trim() || !validDate(parsed.data.date)) {
+  if (!parsed.success) {
     res.status(400).json({ error: "Enter a title, valid calendar date, and all event fields." });
     return;
   }
@@ -126,7 +121,7 @@ router.post("/haas/events", requireAdmin, async (req, res): Promise<void> => {
 router.put("/haas/events/:id", requireAdmin, async (req, res): Promise<void> => {
   const params = UpdateEventParams.safeParse(req.params);
   const parsed = UpdateEventBody.safeParse(req.body);
-  if (!params.success || !parsed.success || !parsed.data.title.trim() || !validDate(parsed.data.date)) {
+  if (!params.success || !parsed.success) {
     res.status(400).json({ error: "Enter a valid event, title, calendar date, and all event fields." });
     return;
   }

@@ -305,7 +305,8 @@ describe("event calendar dates", () => {
   });
 
   const validDays = [
-    "2000-02-29", "2024-02-29", "2032-02-29",
+    "0000-02-29", "0096-02-29", "1900-02-28", "2000-02-29",
+    "2024-02-29", "2032-02-29", "2100-02-28", "2400-02-29", "9999-12-31",
     "2031-12-31", "2032-01-01",
     // US daylight-saving transitions must remain calendar dates, not instants.
     "2032-03-14", "2032-11-07",
@@ -349,10 +350,33 @@ describe("event calendar dates", () => {
     "", "not-a-date", "2031-02-29", "1900-02-29", "2100-02-29",
     "2032-02-30", "2032-04-31", "2032-00-15", "2032-13-01",
     "2032-01-00", "2032-01-32", "2032-1-01", "32-01-01",
-    "2032-01-01T00:00:00Z", " 2032-01-01", "2032-01-01 ",
+    "2032-01-01T00:00:00Z", " 2032-01-01", "2032-01-01 ", "2032-01-01\n",
     null, 20320101,
   ];
   for (const method of ["post", "put"] as const) {
+    it.each(["", "   ", "\t\r\n", "\u00a0\u2003", "x".repeat(201)])(
+      `rejects invalid required title %j on ${method}`, async (title) => {
+        const path = method === "post" ? "/haas/events" : "/haas/events/42";
+        const response = await request(app)[method](path).send({ ...event, title });
+        expect(response.status).toBe(400);
+        expect(response.body.error).toMatch(/title/);
+      },
+    );
+
+    it(`trims the title before saving on ${method}`, async () => {
+      const path = method === "post" ? "/haas/events" : "/haas/events/42";
+      const write = vi.fn((data: typeof event) => ({
+        returning: async () => [{ ...data, id: 42 }],
+        where: () => ({ returning: async () => [{ ...data, id: 42 }] }),
+      }));
+      mocks.insert.mockReturnValue({ values: write });
+      mocks.update.mockReturnValue({ set: write });
+      const response = await request(app)[method](path).send({ ...event, title: "  Community gathering \t" });
+      expect(response.status).toBe(method === "post" ? 201 : 200);
+      expect(response.body.title).toBe("Community gathering");
+      expect(write).toHaveBeenCalledWith({ ...event, title: "Community gathering" });
+    });
+
     it.each(invalidDays)(`rejects invalid calendar date %j on ${method} before writing`, async (date) => {
       const path = method === "post" ? "/haas/events" : "/haas/events/42";
       const response = await request(app)[method](path).send({ ...event, date });

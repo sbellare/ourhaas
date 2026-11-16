@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarIcon, Pencil, Plus, ShieldAlert, Trash2, LogIn } from "lucide-react";
@@ -23,17 +22,8 @@ import { CategoryChip, DateBlock, EventSkeleton, LoadError } from "@/components/
 import { parseDay, splitEvents, toDay } from "@/lib/haas";
 import { CommitteeEditor } from "@/components/committee-editor";
 import { MembershipEditor } from "@/components/membership-editor";
+import { eventFormSchema, type EventFormValues as FormValues } from "@/lib/event-form";
 
-const schema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(200),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a date"),
-  time: z.string().max(100),
-  location: z.string().max(300),
-  description: z.string().max(5000),
-  category: z.enum(["Spiritual", "Community", "Cultural"]),
-  zeffyUrl: z.string().trim().max(2000).regex(/^(https:\/\/(www\.)?zeffy\.com\/[^\s]*)?$/, "Use a full HTTPS Zeffy form link, or leave this blank."),
-});
-type FormValues = z.infer<typeof schema>;
 const blank: FormValues = { title: "", date: "", time: "", location: "", description: "", category: "Spiritual", zeffyUrl: "" };
 
 function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone: () => void }) {
@@ -45,7 +35,7 @@ function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone
   // Initialize before Radix Select mounts. Resetting after mount makes its
   // native form control emit an empty value and clears the saved category.
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(eventFormSchema),
     defaultValues: initial ? {
       title: initial.title, date: initial.date, time: initial.time,
       location: initial.location, description: initial.description, category: initial.category,

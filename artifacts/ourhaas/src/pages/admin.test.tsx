@@ -96,12 +96,12 @@ describe("event calendar dates", () => {
     const publicPage = screen.getByTestId("public-events");
     await within(publicPage).findByTestId("card-event-42");
     await user.click(await screen.findByRole("button", { name: /New event/ }));
-    await user.type(screen.getByLabelText("Title"), "Leap day gathering");
+    await user.type(screen.getByLabelText("Title"), "  Leap day gathering  ");
     await pickDay(/Sunday, February 29th, 2032/);
     expect(screen.getByTestId("button-date-picker")).toHaveTextContent("Sunday, February 29, 2032");
     await user.click(screen.getByRole("button", { name: "Add event" }));
     expect(await within(publicPage).findByTestId("card-event-43")).toHaveTextContent("Leap day gathering");
-    expect(calls.find((call) => call.method === "POST")?.body).toMatchObject({ date: "2032-02-29" });
+    expect(calls.find((call) => call.method === "POST")?.body).toMatchObject({ title: "Leap day gathering", date: "2032-02-29" });
     await user.click(within(publicPage).getByTestId("card-event-43"));
     expect(screen.getByRole("dialog")).toHaveTextContent("Sunday, February 29, 2032");
   });
@@ -319,11 +319,12 @@ describe("signed-in event management", () => {
     expect(screen.queryByTestId("card-event-42")).not.toBeInTheDocument();
   });
 
-  it("does not submit an empty title", async () => {
+  it.each(["", "   ", "\u00a0\u2003"])("does not submit a blank title %j", async (title) => {
     const user = userEvent.setup();
     mount();
     await user.click(await screen.findByRole("button", { name: "Edit" }));
     await user.clear(screen.getByLabelText("Title"));
+    if (title) await user.type(screen.getByLabelText("Title"), title);
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByText("Title is required")).toBeVisible();
     expect(calls.some((c) => c.method === "PUT")).toBe(false);
