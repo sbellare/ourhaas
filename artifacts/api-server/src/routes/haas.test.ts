@@ -202,3 +202,81 @@ describe("authorized event management and public reads", () => {
     expect((await request(app).get("/haas/events")).body).toEqual([]);
   });
 });
+
+describe("event calendar dates", () => {
+  beforeEach(() => {
+    mocks.userId = "user_test";
+    mocks.getUser.mockResolvedValue(identity());
+  });
+
+  const validDays = [
+    "2000-02-29", "2024-02-29", "2032-02-29",
+    "2031-12-31", "2032-01-01",
+    // US daylight-saving transitions must remain calendar dates, not instants.
+    "2032-03-14", "2032-11-07",
+  ];
+
+  it.each(validDays)("preserves %s through create, public read, edit and another public read", async (date) => {
+    let saved: (typeof event & { id: number }) | undefined;
+    mocks.insert.mockReturnValue({
+      values: vi.fn((data: typeof event) => ({
+        returning: async () => { saved = { ...data, id: 42 }; return [saved]; },
+      })),
+    });
+    mocks.update.mockReturnValue({
+      set: vi.fn((data: typeof event) => ({
+        where: () => ({ returning: async () => { saved = { ...data, id: 42 }; return [saved]; } }),
+      })),
+    });
+    mocks.select.mockImplementation(() => ({
+      from: () => ({ orderBy: async () => saved ? [saved] : [] }),
+    }));
+    const created = await request(app).post("/haas/events").send({ ...event, date });
+    expect(created.status).toBe(201);
+    expect(created.body.date).toBe(date);
+    expect(saved?.date).toBe(date);
+    mocks.userId = null;
+    const read = await request(app).get("/haas/events");
+    expect(read.status).toBe(200);
+    expect(read.body[0].date).toBe(date);
+    expect(read.headers["cache-control"]).toBe("no-store");
+    mocks.userId = "user_test";
+    const edited = await request(app).put("/haas/events/42").send({ ...event, title: "Edited event", date });
+    expect(edited.status).toBe(200);
+    expect(edited.body.date).toBe(date);
+    expect(saved?.date).toBe(date);
+    mocks.userId = null;
+    const refreshed = await request(app).get("/haas/events");
+    expect(refreshed.body[0]).toMatchObject({ date, title: "Edited event" });
+  });
+
+  const invalidDays = [
+    "", "not-a-date", "2031-02-29", "1900-02-29", "2100-02-29",
+    "2032-02-30", "2032-04-31", "2032-00-15", "2032-13-01",
+    "2032-01-00", "2032-01-32", "2032-1-01", "32-01-01",
+    "2032-01-01T00:00:00Z", " 2032-01-01", "2032-01-01 ",
+    null, 20320101,
+  ];
+  for (const method of ["post", "put"] as const) {
+    it.each(invalidDays)(`rejects invalid calendar date %j on ${method} before writing`, async (date) => {
+      const path = method === "post" ? "/haas/events" : "/haas/events/42";
+      const response = await request(app)[method](path).send({ ...event, date });
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/calendar date/);
+      expectNoStorageAccess();
+    });
+  }
+
+  it("persists an edited date across the year boundary without altering its day", async () => {
+    mocks.update.mockReturnValue({
+      set: vi.fn((data: typeof event) => ({
+        where: () => ({ returning: async () => [{ ...data, id: 42 }] }),
+      })),
+    });
+    for (const date of ["2031-12-31", "2032-01-01", "2032-02-29"]) {
+      const response = await request(app).put("/haas/events/42").send({ ...event, date });
+      expect(response.status).toBe(200);
+      expect(response.body.date).toBe(date);
+    }
+  });
+});

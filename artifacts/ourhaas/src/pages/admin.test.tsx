@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommunityEvent } from "@workspace/api-client-react";
 import Admin from "./admin";
 import Events from "./events";
@@ -50,6 +50,7 @@ beforeEach(() => {
     if (url === "/api/haas/admin") {
       return failure === "access" ? json({ error: "Unavailable" }, 500) : json(status);
     }
+    if (url === "/api/haas/committee") return json([]);
     if (url === "/api/haas/events" && method === "GET") return json(rows);
     if (url.startsWith("/api/haas/events") && method !== "GET") {
       if (!status.signedIn) return json({ error: "Sign in" }, 401);
@@ -73,6 +74,91 @@ beforeEach(() => {
     }
     throw new Error(`Unexpected request: ${method} ${url}`);
   }));
+});
+
+afterEach(() => vi.useRealTimers());
+
+describe("event calendar dates", () => {
+  beforeEach(() => {
+    // Freeze only Date so user events, React Query and Radix use real timers.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2032, 1, 1, 12));
+  });
+
+  async function pickDay(label: RegExp) {
+    await userEvent.click(screen.getByTestId("button-date-picker"));
+    await userEvent.click(screen.getByRole("button", { name: label }));
+  }
+
+  it("creates the selected leap day and refreshes an already mounted public list", async () => {
+    const user = userEvent.setup();
+    mount(<><Admin /><div data-testid="public-events"><Events /></div></>);
+    const publicPage = screen.getByTestId("public-events");
+    await within(publicPage).findByTestId("card-event-42");
+    await user.click(await screen.findByRole("button", { name: /New event/ }));
+    await user.type(screen.getByLabelText("Title"), "Leap day gathering");
+    await pickDay(/Sunday, February 29th, 2032/);
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent("Sunday, February 29, 2032");
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    expect(await within(publicPage).findByTestId("card-event-43")).toHaveTextContent("Leap day gathering");
+    expect(calls.find((call) => call.method === "POST")?.body).toMatchObject({ date: "2032-02-29" });
+    await user.click(within(publicPage).getByTestId("card-event-43"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Sunday, February 29, 2032");
+  });
+
+  it("edits across New Year, discards cancelled dates, and reopens the saved date", async () => {
+    rows = [{ ...seed, date: "2031-12-31" }];
+    const user = userEvent.setup();
+    mount(<><Admin /><div data-testid="public-events"><Events /></div></>);
+    const publicPage = screen.getByTestId("public-events");
+    await within(publicPage).findByTestId("card-event-42");
+    await user.click(await screen.findByTestId("button-edit-42"));
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent("Wednesday, December 31, 2031");
+    await user.click(screen.getByTestId("button-date-picker"));
+    await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
+    await user.click(screen.getByRole("button", { name: /Thursday, January 1st, 2032/ }));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(calls.some((call) => call.method === "PUT")).toBe(false);
+    await user.click(screen.getByTestId("button-edit-42"));
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent("Wednesday, December 31, 2031");
+    await user.click(screen.getByTestId("button-date-picker"));
+    expect(screen.getByRole("button", { name: /Wednesday, December 31st, 2031/ })).toHaveAttribute("data-selected-single", "true");
+    await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
+    await user.click(screen.getByRole("button", { name: /Thursday, January 1st, 2032/ }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(calls.find((call) => call.method === "PUT")?.body).toMatchObject({ date: "2032-01-01" });
+    await waitFor(() => expect(within(publicPage).getByTestId("card-event-42")).toHaveTextContent("Jan1"));
+    await user.click(screen.getByTestId("button-edit-42"));
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent("Thursday, January 1, 2032");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(within(publicPage).getByTestId("card-event-42"));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Thursday, January 1, 2032");
+  });
+
+  it("requires a date and resets an unsaved new event when cancelled", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("button", { name: /New event/ }));
+    await user.type(screen.getByLabelText("Title"), "Unsaved gathering");
+    await user.click(screen.getByRole("button", { name: "Add event" }));
+    expect(await screen.findByText("Pick a date")).toBeVisible();
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+    await pickDay(/Sunday, February 29th, 2032/);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: /New event/ }));
+    expect(screen.getByLabelText("Title")).toHaveValue("");
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent("Choose a date on the calendar");
+  });
+
+  it("does not offer February 29 in a non-leap year", async () => {
+    vi.setSystemTime(new Date(2031, 1, 1, 12));
+    mount();
+    await userEvent.click(await screen.findByRole("button", { name: /New event/ }));
+    await userEvent.click(screen.getByTestId("button-date-picker"));
+    expect(screen.getByRole("button", { name: /Friday, February 28th, 2031/ })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /February 29/ })).not.toBeInTheDocument();
+  });
 });
 
 describe("administrator access states", () => {
