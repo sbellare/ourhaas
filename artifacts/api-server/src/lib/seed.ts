@@ -1,4 +1,5 @@
 import { db, eventsTable, setupTable, committeeTable, membershipTable } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 // Data-only initialization works in both environments, without schema changes
 // at startup. The marker prevents deleted or edited source events reappearing.
@@ -15,12 +16,16 @@ export async function seedSourceEvents(): Promise<void> {
   }).onConflictDoNothing({ target: membershipTable.id });
   await db.insert(committeeTable).values([
     { role: "President", name: "Sachin Bellare", position: 0 },
-    { role: "Secretary", name: "Sheetal Sashital", position: 1 },
-    { role: "Vice President", name: "Prateek Karkal", position: 2 },
+    { role: "Vice President", name: "Prateek Karkal", position: 1 },
+    { role: "Secretary", name: "Sheetal Sashital", position: 2 },
     { role: "Food", name: "Varun Chadarvarkar", position: 3 },
-    { role: "Treasurer", name: "Rupa Rao Dominitz", position: 4 },
-    { role: "Events", name: "Mahesh Sashital", position: 5 },
-  ]).onConflictDoNothing({ target: committeeTable.role });
+    { role: "Events", name: "Mahesh Sashital", position: 4 },
+    { role: "Treasurer", name: "Rupa Rao Dominitz", position: 5 },
+  ]).onConflictDoUpdate({
+    target: committeeTable.role,
+    // Apply the requested display order without replacing admin-edited names.
+    set: { position: sql`excluded.position` },
+  });
   await db.transaction(async (tx) => {
     const initialized = await tx.insert(setupTable)
       .values({ key: "original-source-events" }).onConflictDoNothing().returning();
