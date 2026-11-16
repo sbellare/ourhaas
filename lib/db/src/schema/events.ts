@@ -10,6 +10,7 @@ export const eventsTable = pgTable("haas_events", {
   location: text("location").notNull().default(""),
   description: text("description").notNull().default(""),
   category: text("category").notNull(),
+  zeffyUrl: text("zeffy_url").notNull().default(""),
 });
 export const insertEventSchema = createInsertSchema(eventsTable).omit({ id: true });
 export type InsertEvent = z.infer<typeof insertEventSchema>;

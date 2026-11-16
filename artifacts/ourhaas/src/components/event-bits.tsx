@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Clock, MapPin } from "lucide-react";
+import { ArrowUpRight, Clock, MapPin } from "lucide-react";
 import type { CommunityEvent } from "@workspace/api-client-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CATEGORY_STYLE, CONTACT_EMAIL, parseDay } from "@/lib/haas";
@@ -38,6 +38,7 @@ export function EventRow({ event, past, onOpen }: { event: CommunityEvent; past?
         <div className="flex flex-wrap items-center gap-2">
           <CategoryChip category={event.category} />
           {past && <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Past</span>}
+          {event.zeffyUrl && <span className="text-xs font-medium text-primary">Zeffy registration available</span>}
         </div>
         <h3 className="font-display mt-2 text-2xl font-semibold leading-tight transition-colors group-hover:text-primary">{event.title}</h3>
         <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
@@ -52,7 +53,7 @@ export function EventRow({ event, past, onOpen }: { event: CommunityEvent; past?
 export function EventDialog({ event, onClose }: { event: CommunityEvent | null; onClose: () => void }) {
   return (
     <Dialog open={!!event} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg rounded-3xl border-card-border bg-card">
+      <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto rounded-3xl border-card-border bg-card">
         {event && (
           <>
             <DialogHeader>
@@ -66,6 +67,15 @@ export function EventDialog({ event, onClose }: { event: CommunityEvent | null; 
               {event.time && <p className="flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />{event.time}</p>}
               {event.location && <p className="flex items-center gap-2"><MapPin className="h-4 w-4 text-primary" />{event.location}</p>}
               {event.description && <p className="whitespace-pre-line leading-relaxed text-foreground/85">{event.description}</p>}
+              {event.zeffyUrl && (
+                <section aria-label="Event registration" className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                  <h3 className="font-display text-xl font-semibold">Event registration</h3>
+                  <p className="mt-2 text-muted-foreground">Payment and registration are handled securely on Zeffy. Opens in a new tab.</p>
+                  <a href={event.zeffyUrl} target="_blank" rel="noopener noreferrer" data-testid="link-event-zeffy" className="mt-4 inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-center font-semibold text-primary-foreground hover:bg-primary/90">
+                    Pay / Register with Zeffy <ArrowUpRight aria-hidden className="h-4 w-4 shrink-0" />
+                  </a>
+                </section>
+              )}
               <p className="rounded-2xl bg-muted p-3 text-muted-foreground">
                 Details are shared through Evite and the Our HAAS WhatsApp group. Questions? Write to{" "}
                 <a className="text-primary underline" href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(event.title)}`}>{CONTACT_EMAIL}</a>.

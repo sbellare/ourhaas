@@ -31,9 +31,10 @@ const schema = z.object({
   location: z.string().max(300),
   description: z.string().max(5000),
   category: z.enum(["Spiritual", "Community", "Cultural"]),
+  zeffyUrl: z.string().trim().max(2000).regex(/^(https:\/\/(www\.)?zeffy\.com\/[^\s]*)?$/, "Use a full HTTPS Zeffy form link, or leave this blank."),
 });
 type FormValues = z.infer<typeof schema>;
-const blank: FormValues = { title: "", date: "", time: "", location: "", description: "", category: "Spiritual" };
+const blank: FormValues = { title: "", date: "", time: "", location: "", description: "", category: "Spiritual", zeffyUrl: "" };
 
 function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone: () => void }) {
   const qc = useQueryClient();
@@ -48,6 +49,7 @@ function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone
     defaultValues: initial ? {
       title: initial.title, date: initial.date, time: initial.time,
       location: initial.location, description: initial.description, category: initial.category,
+      zeffyUrl: initial.zeffyUrl ?? "",
     } : blank,
   });
 
@@ -114,6 +116,14 @@ function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone
         )} />
         <FormField control={form.control} name="description" render={({ field }) => (
           <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea rows={4} {...field} data-testid="input-description" /></FormControl><FormMessage /></FormItem>
+        )} />
+        <FormField control={form.control} name="zeffyUrl" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Zeffy payment / registration link (optional)</FormLabel>
+            <FormControl><Input type="url" placeholder="https://www.zeffy.com/en-US/ticketing/…" maxLength={2000} {...field} data-testid="input-event-zeffy" aria-describedby="event-zeffy-help" /></FormControl>
+            <p id="event-zeffy-help" className="text-sm text-muted-foreground">Paste this event’s Zeffy form link. Leave blank to hide the payment button, or clear it to remove an existing link. This is separate from annual membership.</p>
+            <FormMessage />
+          </FormItem>
         )} />
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onDone} className="rounded-full px-4 py-2 text-sm hover:bg-muted">Cancel</button>

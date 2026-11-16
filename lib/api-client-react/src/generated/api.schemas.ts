@@ -79,6 +79,12 @@ export interface EventInput {
   /** @maxLength 5000 */
   description: string;
   category: EventInputCategory;
+  /**
+     * Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.
+     * @maxLength 2000
+     * @pattern ^(https://(www\.)?zeffy\.com/[^\s]*)?$
+     */
+  zeffyUrl?: string;
 }
 
 export type CommunityEvent = EventInput & {

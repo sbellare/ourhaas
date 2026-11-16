@@ -216,6 +216,7 @@ describe("signed-in event management", () => {
       body: {
         title: "New regression gathering", date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
         time: "7:00 PM", location: "Community hall", description: "New details", category: "Spiritual",
+        zeffyUrl: "",
       },
     });
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Event added" }));
@@ -234,6 +235,8 @@ describe("signed-in event management", () => {
     await user.clear(within(dialog).getByLabelText("Location"));
     await user.clear(within(dialog).getByLabelText("Description"));
     await user.type(within(dialog).getByLabelText("Description"), "Updated public details");
+    const zeffyUrl = "https://www.zeffy.com/en-US/ticketing/event-registration";
+    await user.type(within(dialog).getByTestId("input-event-zeffy"), zeffyUrl);
     await user.click(within(dialog).getByTestId("select-category"));
     await user.click(screen.getByRole("option", { name: "Cultural" }));
     await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
@@ -243,6 +246,7 @@ describe("signed-in event management", () => {
       body: {
         title: "Updated gathering", date: seed.date, time: seed.time,
         location: "", description: "Updated public details", category: "Cultural",
+        zeffyUrl,
       },
     });
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: "Event updated" }));
@@ -254,6 +258,7 @@ describe("signed-in event management", () => {
     expect(within(dialog).getByLabelText("Title")).toHaveValue("Updated gathering");
     expect(within(dialog).getByLabelText("Location")).toHaveValue("");
     expect(within(dialog).getByLabelText("Description")).toHaveValue("Updated public details");
+    expect(within(dialog).getByTestId("input-event-zeffy")).toHaveValue(zeffyUrl);
     expect(within(dialog).getByTestId("select-category")).toHaveTextContent("Cultural");
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await user.click(screen.getByRole("button", { name: /New event/ }));
@@ -265,6 +270,34 @@ describe("signed-in event management", () => {
     await user.click(await screen.findByTestId("card-event-42"));
     expect(screen.getByTestId("text-event-title")).toHaveTextContent("Updated gathering");
     expect(within(screen.getByRole("dialog")).getByText("Updated public details")).toBeVisible();
+    const paymentLink = screen.getByRole("link", { name: /Pay \/ Register with Zeffy/ });
+    expect(paymentLink).toHaveAttribute("href", zeffyUrl);
+    expect(paymentLink).toHaveAttribute("target", "_blank");
+    expect(paymentLink).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("rejects non-Zeffy links, discards unsaved changes, and removes cleared payment links", async () => {
+    const user = userEvent.setup();
+    rows[0].zeffyUrl = "https://www.zeffy.com/en-US/ticketing/original-event";
+    mount();
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    const input = screen.getByTestId("input-event-zeffy");
+    await user.clear(input);
+    await user.type(input, "https://example.com/not-zeffy");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(await screen.findByText("Use a full HTTPS Zeffy form link, or leave this blank.")).toBeVisible();
+    expect(calls.some((call) => call.method === "PUT")).toBe(false);
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    expect(screen.getByTestId("input-event-zeffy")).toHaveValue(rows[0].zeffyUrl);
+    await user.clear(screen.getByTestId("input-event-zeffy"));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(calls.find((call) => call.method === "PUT")?.body).toMatchObject({ zeffyUrl: "" });
+    cleanup();
+    mount(<Events />);
+    await user.click(await screen.findByTestId("card-event-42"));
+    expect(screen.queryByTestId("link-event-zeffy")).not.toBeInTheDocument();
   });
 
   it("requires confirmation, preserves cancelled deletes and refreshes after deletion", async () => {

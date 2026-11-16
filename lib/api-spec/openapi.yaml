@@ -188,6 +188,11 @@ components:
         location: { type: string, maxLength: 300 }
         description: { type: string, maxLength: 5000 }
         category: { type: string, enum: [Spiritual, Community, Cultural] }
+        zeffyUrl:
+          type: string
+          maxLength: 2000
+          pattern: '^(https://(www\.)?zeffy\.com/[^\s]*)?$'
+          description: Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.
     CommunityEvent:
       allOf:
         - $ref: "#/components/schemas/EventInput"

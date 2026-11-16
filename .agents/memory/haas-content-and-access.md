@@ -20,3 +20,9 @@ Membership enrollment stays on Zeffy when making membership information editable
 **Why:** The user asked for administrator editing of the existing membership section, not a replacement payment system.
 
 **How to apply:** Let the administrator change the year and Zeffy form link independently; changing a displayed year does not create a new enrollment form. Retain the existing payment destination until the administrator supplies a replacement.
+
+Event registration uses separate, optional Zeffy links for each event.
+
+**Why:** The user selected per-event payment links rather than one shared link.
+
+**How to apply:** Administrators supply each event’s own Zeffy link. Do not reuse the annual membership link as a default for event payments, and hide the event payment action when no link is configured.

@@ -206,6 +206,41 @@ describe("assigned administrator authorization", () => {
 });
 
 describe("authorized event management and public reads", () => {
+  it.each([
+    "http://www.zeffy.com/en-US/ticketing/test",
+    "javascript:alert(1)",
+    "https://zeffy.com.evil.example/pay",
+    "https://www.zeffy.com@evil.example/pay",
+    "https://evil.example/?next=https://www.zeffy.com/",
+    "https://user:password@www.zeffy.com/pay",
+    "https://www.zeffy.com/pay with spaces",
+  ])("rejects unsafe event payment link %s before changing storage", async (zeffyUrl) => {
+    mocks.userId = "user_test";
+    mocks.getUser.mockResolvedValue(identity());
+    for (const { method, path } of mutations.filter((mutation) => mutation.method !== "delete")) {
+      expect((await request(app)[method](path).send({ ...event, zeffyUrl })).status).toBe(400);
+    }
+    expectNoStorageAccess();
+  });
+
+  it.each(["", "https://www.zeffy.com/en-US/ticketing/test", "https://zeffy.com/en-CA/ticketing/test?source=haas"])
+  ("saves and clears per-event Zeffy links (%s)", async (zeffyUrl) => {
+    mocks.userId = "user_test";
+    mocks.getUser.mockResolvedValue(identity());
+    const input = { ...event, zeffyUrl };
+    const returning = async () => [{ ...input, id: 42 }];
+    mocks.insert.mockReturnValue({ values: vi.fn().mockReturnValue({ returning }) });
+    const set = vi.fn().mockReturnValue({ where: () => ({ returning }) });
+    mocks.update.mockReturnValue({ set });
+    const created = await request(app).post("/haas/events").send(input);
+    expect(created.status).toBe(201);
+    expect(created.body.zeffyUrl).toBe(zeffyUrl);
+    const updated = await request(app).put("/haas/events/42").send(input);
+    expect(updated.status).toBe(200);
+    expect(updated.body.zeffyUrl).toBe(zeffyUrl);
+    expect(set).toHaveBeenCalledWith(input);
+  });
+
   it("creates, reads, updates, reads again and deletes through the real handlers", async () => {
     // In-memory storage is scoped to this test; real persistence is verified by
     // the signed-in browser run against development PostgreSQL.
