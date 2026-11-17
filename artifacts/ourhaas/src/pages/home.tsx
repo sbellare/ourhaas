@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { COMMITTEE_TERM } from "@workspace/haas-content";
 import { Link } from "wouter";
 import { ArrowRight, ArrowUpRight, Mail } from "lucide-react";
@@ -12,8 +12,17 @@ export default function Home() {
   const pages = useListContentPages();
   const membership = useGetMembership({ query: { queryKey: getGetMembershipQueryKey(), refetchInterval: 30000 } });
   const committee = useListCommittee({ query: { queryKey: getListCommitteeQueryKey(), refetchInterval: 30000 } });
-  const [open, setOpen] = useState<CommunityEvent | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<CommunityEvent["id"] | null>(null);
+  const openEvent = events.data?.find((event) => event.id === selectedEventId) ?? null;
+  const openEventDetails = (event: CommunityEvent) => setSelectedEventId(event.id);
   const { upcoming, past } = splitEvents(events.data);
+
+  useEffect(() => {
+    // A failed refresh cannot confirm that the selected event was deleted.
+    if (events.isSuccess && selectedEventId !== null && !openEvent) {
+      setSelectedEventId(null);
+    }
+  }, [events.isSuccess, selectedEventId, openEvent]);
 
   return (
     <>
@@ -65,12 +74,12 @@ export default function Home() {
               {past[0] && (
                 <div>
                   <p className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Most recently</p>
-                  <EventRow event={past[0]} past onOpen={setOpen} />
+                  <EventRow event={past[0]} past onOpen={openEventDetails} />
                 </div>
               )}
             </div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">{upcoming.slice(0, 4).map((e) => <EventRow key={e.id} event={e} onOpen={setOpen} />)}</div>
+            <div className="grid gap-3 md:grid-cols-2">{upcoming.slice(0, 4).map((e) => <EventRow key={e.id} event={e} onOpen={openEventDetails} />)}</div>
           )}
         </div>
       </section>
@@ -133,7 +142,7 @@ export default function Home() {
         <h2 className="font-display text-4xl font-semibold md:text-5xl">Questions? Say hello.</h2>
         <a href={`mailto:${CONTACT_EMAIL}`} data-testid="link-email-home" className="mt-6 inline-flex items-center gap-2 font-display text-2xl text-primary underline-offset-8 hover:underline md:text-3xl"><Mail className="h-6 w-6" />{CONTACT_EMAIL}</a>
       </section>
-      <EventDialog event={open} onClose={() => setOpen(null)} />
+      <EventDialog event={openEvent} onClose={() => setSelectedEventId(null)} />
     </>
   );
 }
