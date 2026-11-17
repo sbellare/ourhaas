@@ -1,1 +1,2 @@
 - [HAAS content and access](haas-content-and-access.md) — preserve source dates and distinguish past events; administrator access follows an owner-assigned verified account.
+- [Vercel TypeScript emission](vercel-typescript.md) — a passing esbuild or tsc check does not guarantee Vercel’s per-file compiler can emit workspace imports.
