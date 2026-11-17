@@ -6,13 +6,21 @@ import { PageHero } from "@/components/site-layout";
 import { EventDialog, EventRow, EventSkeleton, LoadError, UpcomingEmpty } from "@/components/event-bits";
 import { CATEGORY_STYLE, parseDay, splitEvents, toDay, todayDay } from "@/lib/haas";
 
-function MonthGrid({ events, onOpen }: { events: CommunityEvent[]; onOpen: (e: CommunityEvent) => void }) {
+function MonthGrid({ events, onOpen, selectedMonth, onMonthChange }: {
+  events: CommunityEvent[];
+  onOpen: (e: CommunityEvent) => void;
+  selectedMonth: Date | null;
+  onMonthChange: (month: Date) => void;
+}) {
   const initial = useMemo(() => {
     const { upcoming, past } = splitEvents(events);
     const pick = upcoming[0] ?? past[0];
     return pick ? parseDay(pick.date) : new Date();
   }, [events]);
-  const [month, setMonth] = useState(startOfMonth(initial));
+  const month = selectedMonth ?? startOfMonth(initial);
+  useEffect(() => {
+    if (selectedMonth === null) onMonthChange(startOfMonth(initial));
+  }, [selectedMonth, initial, onMonthChange]);
   const byDay = useMemo(() => {
     const m = new Map<string, CommunityEvent[]>();
     events.forEach((e) => m.set(e.date, [...(m.get(e.date) ?? []), e]));
@@ -24,9 +32,9 @@ function MonthGrid({ events, onOpen }: { events: CommunityEvent[]; onOpen: (e: C
   return (
     <div className="overflow-hidden rounded-3xl border border-card-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <button type="button" onClick={() => setMonth((m) => subMonths(m, 1))} className="rounded-full p-2 hover:bg-muted" aria-label="Previous month" data-testid="button-prev-month"><ChevronLeft className="h-5 w-5" /></button>
+        <button type="button" onClick={() => onMonthChange(subMonths(month, 1))} className="rounded-full p-2 hover:bg-muted" aria-label="Previous month" data-testid="button-prev-month"><ChevronLeft className="h-5 w-5" /></button>
         <p className="font-display text-2xl font-semibold" data-testid="text-month">{format(month, "MMMM yyyy")}</p>
-        <button type="button" onClick={() => setMonth((m) => addMonths(m, 1))} className="rounded-full p-2 hover:bg-muted" aria-label="Next month" data-testid="button-next-month"><ChevronRight className="h-5 w-5" /></button>
+        <button type="button" onClick={() => onMonthChange(addMonths(month, 1))} className="rounded-full p-2 hover:bg-muted" aria-label="Next month" data-testid="button-next-month"><ChevronRight className="h-5 w-5" /></button>
       </div>
       <div className="grid grid-cols-7 border-b border-border bg-muted/50 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => <div key={d} className="py-2">{d}</div>)}
@@ -57,6 +65,8 @@ function MonthGrid({ events, onOpen }: { events: CommunityEvent[]; onOpen: (e: C
 export default function Events() {
   const events = useListEvents({ query: { queryKey: getListEventsQueryKey(), refetchInterval: 30000 } });
   const [view, setView] = useState<"list" | "calendar">("list");
+  // The error screen unmounts MonthGrid; retain the visitor's month here.
+  const [calendarMonth, setCalendarMonth] = useState<Date | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<CommunityEvent["id"] | null>(null);
   const openEvent = events.data?.find((event) => event.id === selectedEventId) ?? null;
   const openEventDetails = (event: CommunityEvent) => setSelectedEventId(event.id);
@@ -84,7 +94,7 @@ export default function Events() {
         </div>
         <div className="mt-8">
           {events.isLoading ? <EventSkeleton /> : events.isError ? <LoadError what="events" onRetry={() => events.refetch()} /> : view === "calendar" ? (
-            <MonthGrid events={events.data ?? []} onOpen={openEventDetails} />
+            <MonthGrid events={events.data ?? []} onOpen={openEventDetails} selectedMonth={calendarMonth} onMonthChange={setCalendarMonth} />
           ) : (
             <div className="space-y-16">
               <section>

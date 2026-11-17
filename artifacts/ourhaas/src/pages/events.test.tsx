@@ -36,6 +36,52 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+describe("event loading error recovery", () => {
+  it("keeps the visitor's calendar month after a failed background refresh and retry", async () => {
+    const { client } = mount();
+    await screen.findByTestId("card-event-1");
+    await userEvent.click(screen.getByTestId("button-view-calendar"));
+    await userEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("Temporarily offline"));
+    await refreshEvents(client);
+    expect(await screen.findByTestId("button-retry")).toBeVisible();
+    expect(client.getQueryState(getListEventsQueryKey())?.status).toBe("error");
+    expect(screen.queryByTestId("empty-upcoming")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("button-retry"));
+    await waitFor(() => expect(screen.queryByTestId("button-retry")).not.toBeInTheDocument());
+    expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+    expect(screen.getByTestId("button-cal-event-2")).toBeVisible();
+  });
+
+  it.each(["list", "calendar"] as const)("does not treat a failed refresh as deletion of details opened from the %s", async (view) => {
+    const { client } = mount();
+    await screen.findByTestId("card-event-2");
+    if (view === "calendar") {
+      await userEvent.click(screen.getByTestId("button-view-calendar"));
+      await userEvent.click(screen.getByRole("button", { name: "Previous month" }));
+    }
+    await userEvent.click(screen.getByTestId(view === "calendar" ? "button-cal-event-2" : "card-event-2"));
+
+    vi.mocked(fetch).mockRejectedValueOnce(new Error("Temporarily offline"));
+    await refreshEvents(client);
+    expect(await screen.findByTestId("button-retry")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toHaveTextContent("Gathering 2031-12-31");
+    expect(screen.queryByTestId("empty-upcoming")).not.toBeInTheDocument();
+
+    rows = rows.map((row) => row.id === 2 ? { ...row, title: "Recovered gathering" } : row);
+    await refreshEvents(client);
+    expect(await screen.findByRole("heading", { name: "Recovered gathering" })).toBeVisible();
+    expect(screen.queryByTestId("button-retry")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    if (view === "calendar") {
+      expect(screen.getByTestId("text-month")).toHaveTextContent("December 2031");
+    }
+  });
+});
+
 describe("open event details after a refresh", () => {
   it.each(["list", "calendar"] as const)("updates all details opened from the %s without resetting the calendar month", async (view) => {
     const { client } = mount();
