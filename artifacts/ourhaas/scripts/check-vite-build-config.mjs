@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import { loadConfigFromFile } from "vite";
 
 const configFile = fileURLToPath(new URL("../vite.config.ts", import.meta.url));
@@ -25,6 +26,14 @@ afterEach(() => {
 function loadConfig(command) {
   return loadConfigFromFile({ command, mode: "production" }, configFile, undefined, "silent");
 }
+
+test("homepage artwork is included in the website source assets", async () => {
+  const home = await readFile(new URL("../src/pages/home.tsx", import.meta.url), "utf8");
+  const imageImport = home.match(/import\s+heroImg\s+from\s+["'](@\/assets\/[^"']+)["']/);
+  assert(imageImport, "Homepage artwork must not depend on the workspace upload folder");
+  const image = await readFile(new URL(`../src/${imageImport[1].slice(2)}`, import.meta.url));
+  assert(image.length > 0, "The homepage artwork file must not be empty");
+});
 
 test("static builds need neither PORT nor BASE_PATH", async () => {
   const loaded = await loadConfig("build");

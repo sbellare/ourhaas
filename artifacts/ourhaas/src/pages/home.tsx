@@ -5,7 +5,7 @@ import { ArrowRight, ArrowUpRight, Mail } from "lucide-react";
 import { useListEvents, useListContentPages, useListCommittee, getListCommitteeQueryKey, getListEventsQueryKey, useGetMembership, getGetMembershipQueryKey, type CommunityEvent } from "@workspace/api-client-react";
 import { EventDialog, EventRow, EventSkeleton, LoadError, UpcomingEmpty } from "@/components/event-bits";
 import { CONTACT_EMAIL, initials, splitEvents } from "@/lib/haas";
-import heroImg from "@assets/724242577_18110783840493953_2215237320332989956_n_1794888058267.jpeg";
+import heroImg from "@/assets/konkani-dialects.jpeg";
 
 export default function Home() {
   const events = useListEvents({ query: { queryKey: getListEventsQueryKey(), refetchInterval: 30000 } });
