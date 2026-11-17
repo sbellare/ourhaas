@@ -37,9 +37,7 @@ export default function Home() {
             </div>
           </div>
           <figure className="rise relative" style={{ animationDelay: "200ms" }}>
-            <div className="absolute -inset-3 rotate-2 rounded-[2.5rem] bg-accent/40" aria-hidden />
             <img src={heroImg} alt="Konkani dialects: a north-to-south continuum, illustrated from Koli in the north to Kochi Konkani in the south" width={526} height={526} className="relative h-auto w-full rounded-md shadow-2xl" />
-            <figcaption className="relative mt-3 inline-block rounded-full bg-background/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Illustrative artwork</figcaption>
           </figure>
         </div>
       </section>
