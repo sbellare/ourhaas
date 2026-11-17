@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -46,6 +46,8 @@ const textFields = [
 let saved: MembershipSettings;
 let calls: Array<{ method: string; body: MembershipSettings | null }>;
 let failure: number | "network" | null;
+let readFailure: 503 | "network" | null;
+let readGate: Promise<void>;
 
 // Keep the real editor, pages, generated HTTP hooks and React Query cache.
 // Only the HTTP boundary, toast and unrelated page hero shell are replaced.
@@ -110,6 +112,8 @@ beforeEach(() => {
   saved = structuredClone(seed);
   calls = [];
   failure = null;
+  readFailure = null;
+  readGate = Promise.resolve();
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? "GET";
@@ -118,7 +122,12 @@ beforeEach(() => {
     if (url === "/api/haas/membership") {
       const body = typeof init?.body === "string" ? JSON.parse(init.body) as MembershipSettings : null;
       calls.push({ method, body });
-      if (method === "GET") return json(saved);
+      if (method === "GET") {
+        await readGate;
+        if (readFailure === "network") throw new TypeError("Failed to fetch");
+        if (readFailure) return json({ error: "Membership unavailable" }, readFailure);
+        return json(saved);
+      }
       if (method === "PUT" && body) {
         if (failure === "network") throw new TypeError("Failed to fetch");
         if (failure) return json({ error: "Save rejected" }, failure);
@@ -130,6 +139,137 @@ beforeEach(() => {
     if (["/api/haas/events", "/api/haas/pages", "/api/haas/committee"].includes(url)) return json([]);
     throw new Error(`Unexpected request: ${method} ${url}`);
   }));
+});
+
+describe.each([
+  { name: "membership editor", content: <MembershipEditor />, linkId: null },
+  { name: "membership page", content: <Membership />, linkId: "link-zeffy" },
+  { name: "homepage", content: <Home />, linkId: "link-zeffy-home" },
+])("$name loading recovery", ({ content, linkId }) => {
+  const reads = () => calls.filter(({ method }) => method === "GET");
+
+  function holdRead() {
+    let release!: () => void;
+    readGate = new Promise<void>((resolve) => { release = resolve; });
+    return async () => { await act(async () => { release(); }); };
+  }
+
+  function expectNoMembership() {
+    expect(screen.queryByText(/(?:HAAS |Membership )\d{4}/)).not.toBeInTheDocument();
+    for (const values of [seed, revised]) {
+      for (const [field] of textFields) {
+        expect(screen.queryByText(values[field].replace(/\s+/g, " "))).not.toBeInTheDocument();
+      }
+    }
+    expect(screen.queryByTestId("link-zeffy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("link-zeffy-home")).not.toBeInTheDocument();
+    // Catch a hardcoded replacement link as well as the normal registration CTA.
+    expect(document.querySelector('a[href*="zeffy"]')).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Register on Zeffy|Open membership page/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit membership" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Membership year")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save membership" })).not.toBeInTheDocument();
+  }
+
+  async function expectContent(values: MembershipSettings) {
+    if (!linkId) {
+      expect(await screen.findByText(`HAAS ${values.year} Membership`)).toBeVisible();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Edit membership" }));
+      expectDraft(values);
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+    } else {
+      expect(await screen.findByText(`Membership ${values.year}`, { exact: true })).toBeVisible();
+      for (const [field] of textFields) {
+        expect(screen.getByText(values[field].replace(/\s+/g, " "))).toBeVisible();
+      }
+      const link = screen.getByTestId(linkId);
+      expect(link).toHaveAttribute("href", values.registrationUrl);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noreferrer");
+    }
+  }
+
+  it.each([503, "network"] as const)(
+    "shows loading, fails safely after an initial %s GET failure, and recovers through Retry",
+    async (reason) => {
+      readFailure = reason;
+      const releaseInitial = holdRead();
+      const { client } = mount(content);
+      expect(screen.getByText("Loading membership information…")).toHaveAttribute("role", "status");
+      expectNoMembership();
+      expect(client.getQueryData(getGetMembershipQueryKey())).toBeUndefined();
+      expect(reads()).toHaveLength(1);
+
+      await releaseInitial();
+      expect(await screen.findByText("We couldn't load membership information.")).toBeVisible();
+      expect(screen.queryByText("Loading membership information…")).not.toBeInTheDocument();
+      expectNoMembership();
+      expect(client.getQueryData(getGetMembershipQueryKey())).toBeUndefined();
+      expect(reads()).toHaveLength(1);
+
+      readFailure = null;
+      saved = structuredClone(revised);
+      const releaseRetry = holdRead();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(reads()).toHaveLength(2));
+      expect(screen.getByText("Loading membership information…")).toHaveAttribute("role", "status");
+      expectNoMembership();
+      await releaseRetry();
+
+      await expectContent(revised);
+      expect(screen.queryByText("We couldn't load membership information.")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+      expect(screen.queryByText("Loading membership information…")).not.toBeInTheDocument();
+      expect(client.getQueryData(getGetMembershipQueryKey())).toEqual(revised);
+      expect(reads()).toHaveLength(2);
+      expect(calls.every(({ method }) => method === "GET")).toBe(true);
+      expect(toast).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([503, "network"] as const)(
+    "keeps cached membership after a later %s refetch failure and replaces it after Retry",
+    async (reason) => {
+      const { client } = mount(content);
+      await expectContent(seed);
+      expect(reads()).toHaveLength(1);
+
+      readFailure = reason;
+      const releaseRefresh = holdRead();
+      // Use real query invalidation, not fabricated query state or mocked hooks.
+      act(() => { void client.invalidateQueries({ queryKey: getGetMembershipQueryKey() }); });
+      await waitFor(() => expect(reads()).toHaveLength(2));
+      expect(screen.queryByText("Loading membership information…")).not.toBeInTheDocument();
+      await expectContent(seed);
+      await releaseRefresh();
+
+      expect(await screen.findByText("We couldn't load membership information.")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeEnabled();
+      expect(screen.queryByText("Loading membership information…")).not.toBeInTheDocument();
+      expect(client.getQueryData(getGetMembershipQueryKey())).toEqual(seed);
+      await expectContent(seed);
+
+      readFailure = null;
+      saved = structuredClone(revised);
+      const releaseRetry = holdRead();
+      await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(reads()).toHaveLength(3));
+      await expectContent(seed);
+      await releaseRetry();
+
+      await expectContent(revised);
+      expect(screen.queryByText("We couldn't load membership information.")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+      expect(screen.queryByText(`HAAS ${seed.year} Membership`)).not.toBeInTheDocument();
+      expect(screen.queryByText(`Membership ${seed.year}`, { exact: true })).not.toBeInTheDocument();
+      for (const [field] of textFields) expect(screen.queryByText(seed[field])).not.toBeInTheDocument();
+      expect(client.getQueryData(getGetMembershipQueryKey())).toEqual(revised);
+      expect(reads()).toHaveLength(3);
+      expect(calls.every(({ method }) => method === "GET")).toBe(true);
+      expect(toast).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("membership content and independent registration links", () => {
