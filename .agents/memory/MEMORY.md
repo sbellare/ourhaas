@@ -1,2 +1,3 @@
 - [HAAS content and access](haas-content-and-access.md) — preserve source dates and distinguish past events; administrator access follows an owner-assigned verified account.
 - [Vercel TypeScript emission](vercel-typescript.md) — a passing esbuild or tsc check does not guarantee Vercel’s per-file compiler can emit workspace imports.
+- [Build-tool test environment](build-tool-tests.md) — test Vite configuration in native Node; jsdom can break esbuild’s typed-array checks before tests run.
