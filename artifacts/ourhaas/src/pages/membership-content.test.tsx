@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -84,7 +84,7 @@ async function edit(values: MembershipSettings) {
 }
 
 function expectDraft(values: MembershipSettings) {
-  expect(screen.getByLabelText("Membership year")).toHaveValue(values.year);
+  expect(screen.getByLabelText("Membership year")).toHaveValue(Number.isNaN(values.year) ? null : values.year);
   expect(screen.getByLabelText("Zeffy registration URL")).toHaveValue(values.registrationUrl);
   for (const [field, label] of textFields) {
     expect(screen.getByLabelText(label)).toHaveValue(values[field]);
@@ -234,6 +234,145 @@ describe("membership content and independent registration links", () => {
       await waitFor(() => expectPublicContent(revised));
     },
   );
+});
+
+describe("membership editor client-side validation", () => {
+  const detailsError = "Enter a year between 2000 and 2200 and complete all membership details.";
+  const linkError = "Enter a secure https://www.zeffy.com registration link.";
+
+  async function openDraft() {
+    const view = mount();
+    const user = userEvent.setup({ delay: null });
+    await user.click(await screen.findByRole("button", { name: "Edit membership" }));
+    // An unrelated edit must survive rejection as well as the invalid field.
+    await user.clear(screen.getByLabelText("Cheque payments"));
+    await user.type(screen.getByLabelText("Cheque payments"), revised.chequePolicy);
+    return { ...view, user, draft: { ...seed, chequePolicy: revised.chequePolicy } };
+  }
+
+  function expectBlocked(client: QueryClient, draft: MembershipSettings) {
+    expect(calls.filter(({ method }) => method === "PUT")).toEqual([]);
+    expect(saved).toEqual(seed);
+    expect(client.getQueryData(getGetMembershipQueryKey())).toEqual(seed);
+    expectDraft(draft);
+    for (const label of ["Membership year", "Zeffy registration URL", ...textFields.map(([, label]) => label)]) {
+      expect(screen.getByLabelText(label)).toBeEnabled();
+    }
+    expect(screen.getByRole("button", { name: "Save membership" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(toast).not.toHaveBeenCalled();
+  }
+
+  async function saveCorrected(user: ReturnType<typeof userEvent.setup>, expected: MembershipSettings) {
+    await user.click(screen.getByRole("button", { name: "Save membership" }));
+    await screen.findByRole("button", { name: "Edit membership" });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(calls.filter(({ method }) => method === "PUT")).toEqual([{ method: "PUT", body: expected }]);
+    expect(saved).toEqual(expected);
+    expect(toast).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ title: "Membership updated" }));
+    await user.click(screen.getByRole("button", { name: "Edit membership" }));
+    expectDraft(expected);
+  }
+
+  it.each(textFields)("rejects whitespace-only %s with custom validation and saves after correction", async (field, label) => {
+    const { user, client, draft } = await openDraft();
+    const input = screen.getByLabelText(label);
+    const whitespace = "   \n   ";
+    await user.clear(input);
+    await user.type(input, whitespace);
+    // `required` treats whitespace as nonempty, so the editor must trim and reject it.
+    expect(input).toBeValid();
+    await user.click(screen.getByRole("button", { name: "Save membership" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(detailsError);
+    expectBlocked(client, { ...draft, [field]: whitespace });
+    await user.clear(input);
+    await user.type(input, revised[field]);
+    await saveCorrected(user, { ...draft, [field]: revised[field] });
+  });
+
+  it.each([
+    ["http://www.zeffy.com/pay", "non-HTTPS HTTP"],
+    ["ftp://zeffy.com/pay", "non-HTTPS FTP"],
+    ["https://zeffy.com.evil.example/pay", "lookalike bare-domain suffix"],
+    ["https://www.zeffy.com.evil.example/pay", "lookalike www-domain suffix"],
+    ["https://notzeffy.com/pay", "lookalike prefix"],
+    ["https://zeffy-com.example/pay", "lookalike hyphenated domain"],
+    ["https://forms.zeffy.com/pay", "unapproved subdomain"],
+    ["https://www.zeffy.com@evil.example/pay", "trusted domain in credentials"],
+    ["https://evil.example/?next=https://www.zeffy.com/", "trusted domain in query"],
+    ["https://user@zeffy.com/pay", "username on bare domain"],
+    ["https://user:password@www.zeffy.com/pay", "username and password"],
+    ["https://:password@www.zeffy.com/pay", "password without username"],
+  ])("rejects %s (%s) with custom validation and saves after correction", async (url) => {
+    const { user, client, draft } = await openDraft();
+    const input = screen.getByLabelText("Zeffy registration URL");
+    await user.clear(input);
+    await user.type(input, url);
+    // These are syntactically valid URLs: type=url cannot enforce the trust policy.
+    expect(input).toBeValid();
+    await user.click(screen.getByRole("button", { name: "Save membership" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(linkError);
+    expectBlocked(client, { ...draft, registrationUrl: url });
+    await user.clear(input);
+    await user.type(input, revised.registrationUrl);
+    await saveCorrected(user, { ...draft, registrationUrl: revised.registrationUrl });
+  });
+
+  const invalidYears = [
+    { value: "", year: Number.NaN, validity: "valueMissing" },
+    { value: "1999", year: 1999, validity: "rangeUnderflow" },
+    { value: "2201", year: 2201, validity: "rangeOverflow" },
+    { value: "2030.5", year: 2030.5, validity: "stepMismatch" },
+  ] as const;
+
+  it.each(invalidYears)("blocks year '$value' with native $validity and saves after correction", async ({ value, year, validity }) => {
+    const { user, client, draft } = await openDraft();
+    const input = screen.getByLabelText<HTMLInputElement>("Membership year");
+    await user.clear(input);
+    if (value) await user.type(input, value);
+    expect(input.validity[validity]).toBe(true);
+    expect(input).toBeInvalid();
+    await user.click(screen.getByRole("button", { name: "Save membership" }));
+    // Native constraints stop submission before React's handler; no custom alert is expected.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expectBlocked(client, { ...draft, year });
+    await user.clear(input);
+    await user.type(input, String(revised.year));
+    await saveCorrected(user, { ...draft, year: revised.year });
+  });
+
+  it.each(invalidYears)("defensively rejects year '$value' if native validation is bypassed", async ({ value, year }) => {
+    const { user, client, draft } = await openDraft();
+    const input = screen.getByLabelText("Membership year");
+    await user.clear(input);
+    if (value) await user.type(input, value);
+    // Dispatching submit bypasses constraint validation. This exercises only the
+    // editor's defensive guard, not a normal browser Save click.
+    fireEvent.submit(screen.getByRole("button", { name: "Save membership" }).closest("form")!);
+    expect(await screen.findByRole("alert")).toHaveTextContent(detailsError);
+    expectBlocked(client, { ...draft, year });
+    await user.clear(input);
+    await user.type(input, String(revised.year));
+    await saveCorrected(user, { ...draft, year: revised.year });
+  });
+
+  it.each([
+    { value: "", validity: "valueMissing" },
+    { value: "not a URL", validity: "typeMismatch" },
+  ] as const)("blocks URL '$value' with native $validity and saves after correction", async ({ value, validity }) => {
+    const { user, client, draft } = await openDraft();
+    const input = screen.getByLabelText<HTMLInputElement>("Zeffy registration URL");
+    await user.clear(input);
+    if (value) await user.type(input, value);
+    expect(input.validity[validity]).toBe(true);
+    expect(input).toBeInvalid();
+    await user.click(screen.getByRole("button", { name: "Save membership" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expectBlocked(client, { ...draft, registrationUrl: value });
+    await user.clear(input);
+    await user.type(input, revised.registrationUrl);
+    await saveCorrected(user, { ...draft, registrationUrl: revised.registrationUrl });
+  });
 });
 
 describe("membership phone rendering safeguards", () => {
