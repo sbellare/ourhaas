@@ -421,6 +421,76 @@ describe("membership registration safeguards", () => {
     expect(saved).toEqual(before);
   }
 
+  it("returns 503 without inventing public membership when the singleton is missing", async () => {
+    mocks.userId = null;
+    readWhere.mockResolvedValueOnce([]);
+
+    const response = await request(app).get("/haas/membership");
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({ error: "Membership information is not initialized." });
+    expect(readWhere).toHaveBeenCalledExactlyOnceWith(eq(membershipTable.id, 1));
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 503 rather than claiming a save when no singleton can be updated", async () => {
+    const before = structuredClone(saved);
+    const returning = vi.fn().mockResolvedValue([]);
+    setMembership.mockReturnValueOnce({ where: updateWhere });
+    updateWhere.mockReturnValueOnce({ returning });
+
+    const response = await request(app).put("/haas/membership").send({ ...membership, year: 2031 });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({ error: "Membership information is not initialized." });
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith(membershipTable);
+    expect(setMembership).toHaveBeenCalledExactlyOnceWith({ ...membership, year: 2031 });
+    expect(updateWhere).toHaveBeenCalledExactlyOnceWith(eq(membershipTable.id, 1));
+    expect(returning).toHaveBeenCalledExactlyOnceWith();
+    expect(saved).toEqual(before);
+    expect(mocks.select).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 without fallback membership when the database read rejects", async () => {
+    mocks.userId = null;
+    readWhere.mockRejectedValueOnce(new Error("Database read unavailable"));
+
+    const response = await request(app).get("/haas/membership");
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Request failed" });
+    expect(readWhere).toHaveBeenCalledExactlyOnceWith(eq(membershipTable.id, 1));
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 without claiming a save or changing membership when the update rejects", async () => {
+    const before = structuredClone(saved);
+    const returning = vi.fn().mockRejectedValue(new Error("Database update unavailable"));
+    setMembership.mockReturnValueOnce({ where: updateWhere });
+    updateWhere.mockReturnValueOnce({ returning });
+
+    const response = await request(app).put("/haas/membership").send({ ...membership, year: 2031 });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: "Request failed" });
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith(membershipTable);
+    expect(setMembership).toHaveBeenCalledExactlyOnceWith({ ...membership, year: 2031 });
+    expect(updateWhere).toHaveBeenCalledExactlyOnceWith(eq(membershipTable.id, 1));
+    expect(returning).toHaveBeenCalledExactlyOnceWith();
+    expect(saved).toEqual(before);
+    expect(mocks.select).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.delete).not.toHaveBeenCalled();
+    await expectPublicMembership(membership);
+    expect(saved).toEqual(before);
+  });
+
   it("rejects signed-out changes before identity or storage access", async () => {
     mocks.userId = null;
     await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 401);
