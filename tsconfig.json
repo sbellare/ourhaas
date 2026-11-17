@@ -1,5 +1,11 @@
 {
   "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "moduleResolution": "bundler"
+  },
   "compileOnSave": false,
   "files": [],
   "references": [
