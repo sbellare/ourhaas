@@ -4,11 +4,16 @@ import {
   UpdateEventBody as GeneratedUpdateEventBody,
   createEventBodyTitleMax,
   createEventBodyDateRegExp,
+  createEventBodyZeffyUrlMax,
+  createEventBodyZeffyUrlRegExp,
 } from "./generated/api";
 
 // Keep semantic input checks outside generated files so codegen cannot erase
 // them. The public request schemas below are used by both the form and router.
 const eventFields = {
+  zeffyUrl: z.string().trim().max(createEventBodyZeffyUrlMax)
+    .regex(createEventBodyZeffyUrlRegExp, "Use a full HTTPS Zeffy form link, or leave this blank.")
+    .optional(),
   title: z.string().trim().min(1, "Title is required").max(createEventBodyTitleMax),
   date: z.string().regex(createEventBodyDateRegExp, "Pick a date").refine((value) => {
     if (value.length !== 10 || !createEventBodyDateRegExp.test(value)) return false;

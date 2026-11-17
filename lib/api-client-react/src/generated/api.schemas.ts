@@ -80,7 +80,7 @@ export interface EventInput {
   description: string;
   category: EventInputCategory;
   /**
-     * Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.
+     * Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.
      * @maxLength 2000
      * @pattern ^(https://(www\.)?zeffy\.com/[^\s]*)?$
      */

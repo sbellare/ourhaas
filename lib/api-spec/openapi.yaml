@@ -192,7 +192,7 @@ components:
           type: string
           maxLength: 2000
           pattern: '^(https://(www\.)?zeffy\.com/[^\s]*)?$'
-          description: Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.
+          description: Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.
     CommunityEvent:
       allOf:
         - $ref: "#/components/schemas/EventInput"

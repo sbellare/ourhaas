@@ -217,6 +217,14 @@ describe("authorized event management and public reads", () => {
     "https://evil.example/?next=https://www.zeffy.com/",
     "https://user:password@www.zeffy.com/pay",
     "https://www.zeffy.com/pay with spaces",
+    " https://evil.example/pay ",
+    "//zeffy.com/pay",
+    "ftp://zeffy.com/pay",
+    "https://forms.zeffy.com/pay",
+    "https://zeffy.com:443/pay",
+    `https://zeffy.com/${"x".repeat(1983)}`,
+    null,
+    123,
   ])("rejects unsafe event payment link %s before changing storage", async (zeffyUrl) => {
     mocks.userId = "user_test";
     mocks.getUser.mockResolvedValue(identity());
@@ -226,22 +234,66 @@ describe("authorized event management and public reads", () => {
     expectNoStorageAccess();
   });
 
-  it.each(["", "https://www.zeffy.com/en-US/ticketing/test", "https://zeffy.com/en-CA/ticketing/test?source=haas"])
+  it.each([
+    "", " \t\r\n", "\u00a0\u2003",
+    "https://www.zeffy.com/en-US/ticketing/test",
+    "https://zeffy.com/en-CA/ticketing/test?source=haas",
+    " \thttps://www.zeffy.com/en-US/ticketing/test\r\n",
+    "\u00a0https://zeffy.com/en-CA/ticketing/test?source=haas#form\u2003",
+    ` https://zeffy.com/${"x".repeat(1982)} `,
+  ])
   ("saves and clears per-event Zeffy links (%s)", async (zeffyUrl) => {
     mocks.userId = "user_test";
     mocks.getUser.mockResolvedValue(identity());
     const input = { ...event, zeffyUrl };
-    const returning = async () => [{ ...input, id: 42 }];
-    mocks.insert.mockReturnValue({ values: vi.fn().mockReturnValue({ returning }) });
+    const normalized = { ...input, zeffyUrl: zeffyUrl.trim() };
+    const returning = async () => [{ ...normalized, id: 42 }];
+    const values = vi.fn().mockReturnValue({ returning });
+    mocks.insert.mockReturnValue({ values });
     const set = vi.fn().mockReturnValue({ where: () => ({ returning }) });
     mocks.update.mockReturnValue({ set });
     const created = await request(app).post("/haas/events").send(input);
     expect(created.status).toBe(201);
-    expect(created.body.zeffyUrl).toBe(zeffyUrl);
+    expect(created.body.zeffyUrl).toBe(zeffyUrl.trim());
+    expect(values).toHaveBeenCalledWith(normalized);
     const updated = await request(app).put("/haas/events/42").send(input);
     expect(updated.status).toBe(200);
-    expect(updated.body.zeffyUrl).toBe(zeffyUrl);
-    expect(set).toHaveBeenCalledWith(input);
+    expect(updated.body.zeffyUrl).toBe(zeffyUrl.trim());
+    expect(set).toHaveBeenCalledWith(normalized);
+  });
+
+  it("defaults omitted create links to blank and preserves existing links on omitted updates", async () => {
+    mocks.userId = "user_test";
+    mocks.getUser.mockResolvedValue(identity());
+    let saved = { ...event, id: 42, zeffyUrl: "" };
+    const values = vi.fn((data: typeof event & { zeffyUrl?: string }) => ({
+      returning: async () => [saved = { ...saved, ...data }],
+    }));
+    const set = vi.fn((data: typeof event & { zeffyUrl?: string }) => ({
+      where: () => ({ returning: async () => [saved = { ...saved, ...data }] }),
+    }));
+    mocks.insert.mockReturnValue({ values });
+    mocks.update.mockReturnValue({ set });
+
+    const created = await request(app).post("/haas/events").send(event);
+    expect(created.status).toBe(201);
+    expect(created.body.zeffyUrl).toBe("");
+    expect(values).toHaveBeenCalledWith(event);
+
+    const zeffyUrl = "https://zeffy.com/en-US/ticketing/test";
+    const linked = await request(app).put("/haas/events/42").send({ ...event, zeffyUrl });
+    expect(linked.status).toBe(200);
+    expect(linked.body.zeffyUrl).toBe(zeffyUrl);
+
+    const omitted = await request(app).put("/haas/events/42").send(event);
+    expect(omitted.status).toBe(200);
+    expect(omitted.body.zeffyUrl).toBe(zeffyUrl);
+    expect(set).toHaveBeenLastCalledWith(event);
+
+    const cleared = await request(app).put("/haas/events/42").send({ ...event, zeffyUrl: " \t " });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.zeffyUrl).toBe("");
+    expect(set).toHaveBeenLastCalledWith({ ...event, zeffyUrl: "" });
   });
 
   it("creates, reads, updates, reads again and deletes through the real handlers", async () => {

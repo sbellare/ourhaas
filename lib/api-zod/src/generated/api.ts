@@ -145,7 +145,7 @@ export const ListEventsResponseItem = zod.object({
   "location": zod.string().max(listEventsResponseOneLocationMax),
   "description": zod.string().max(listEventsResponseOneDescriptionMax),
   "category": zod.enum(['Spiritual', 'Community', 'Cultural']),
-  "zeffyUrl": zod.string().max(listEventsResponseOneZeffyUrlMax).regex(listEventsResponseOneZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.')
+  "zeffyUrl": zod.string().max(listEventsResponseOneZeffyUrlMax).regex(listEventsResponseOneZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.')
 }).and(zod.object({
   "id": zod.number().int()
 }))
@@ -174,7 +174,7 @@ export const CreateEventBody = zod.object({
   "location": zod.string().max(createEventBodyLocationMax),
   "description": zod.string().max(createEventBodyDescriptionMax),
   "category": zod.enum(['Spiritual', 'Community', 'Cultural']),
-  "zeffyUrl": zod.string().max(createEventBodyZeffyUrlMax).regex(createEventBodyZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.')
+  "zeffyUrl": zod.string().max(createEventBodyZeffyUrlMax).regex(createEventBodyZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.')
 })
 
 export const createEventResponseOneTitleMax = 200;
@@ -199,7 +199,7 @@ export const CreateEventResponse = zod.object({
   "location": zod.string().max(createEventResponseOneLocationMax),
   "description": zod.string().max(createEventResponseOneDescriptionMax),
   "category": zod.enum(['Spiritual', 'Community', 'Cultural']),
-  "zeffyUrl": zod.string().max(createEventResponseOneZeffyUrlMax).regex(createEventResponseOneZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.')
+  "zeffyUrl": zod.string().max(createEventResponseOneZeffyUrlMax).regex(createEventResponseOneZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.')
 }).and(zod.object({
   "id": zod.number().int()
 }))
@@ -231,7 +231,7 @@ export const UpdateEventBody = zod.object({
   "location": zod.string().max(updateEventBodyLocationMax),
   "description": zod.string().max(updateEventBodyDescriptionMax),
   "category": zod.enum(['Spiritual', 'Community', 'Cultural']),
-  "zeffyUrl": zod.string().max(updateEventBodyZeffyUrlMax).regex(updateEventBodyZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.')
+  "zeffyUrl": zod.string().max(updateEventBodyZeffyUrlMax).regex(updateEventBodyZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.')
 })
 
 export const updateEventResponseOneTitleMax = 200;
@@ -256,7 +256,7 @@ export const UpdateEventResponse = zod.object({
   "location": zod.string().max(updateEventResponseOneLocationMax),
   "description": zod.string().max(updateEventResponseOneDescriptionMax),
   "category": zod.enum(['Spiritual', 'Community', 'Cultural']),
-  "zeffyUrl": zod.string().max(updateEventResponseOneZeffyUrlMax).regex(updateEventResponseOneZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event; an empty string removes it.')
+  "zeffyUrl": zod.string().max(updateEventResponseOneZeffyUrlMax).regex(updateEventResponseOneZeffyUrlRegExp).optional().describe('Optional HTTPS Zeffy payment or registration link for this event. Requests trim surrounding whitespace before length and pattern validation; a blank string removes the link, while omission leaves an existing link unchanged.')
 }).and(zod.object({
   "id": zod.number().int()
 }))
