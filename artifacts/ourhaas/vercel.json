@@ -7,6 +7,18 @@
     {
       "source": "/api/:path*",
       "destination": "https://konkani-roots-hub.replit.app/api/:path*"
+    },
+    {
+      "source": "/sign-in/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/sign-up/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/index.html"
     }
   ]
 }

@@ -38,6 +38,18 @@ test("Vercel forwards membership API requests before serving the static website"
   assert.notEqual(destination.hostname, "localhost");
 });
 
+test("Vercel serves sign-in, OAuth callbacks, and the admin destination through the app", async () => {
+  const config = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
+  for (const path of ["sign-in", "sign-up", "admin"]) {
+    const rewrite = config.rewrites.find((rule) => rule.source === `/${path}/:path*`);
+    assert(rewrite, `Missing Vercel route for /${path} and its nested paths`);
+    assert.equal(rewrite.destination, "/index.html");
+  }
+  // Authentication requests must continue reaching the API proxy, not the HTML app.
+  assert.equal(config.rewrites[0].source, "/api/:path*");
+  assert.notEqual(config.rewrites[0].destination, "/index.html");
+});
+
 test("homepage artwork is included in the website source assets", async () => {
   const home = await readFile(new URL("../src/pages/home.tsx", import.meta.url), "utf8");
   const imageImport = home.match(/import\s+heroImg\s+from\s+["'](@\/assets\/[^"']+)["']/);

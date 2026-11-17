@@ -2,3 +2,4 @@
 - [Vercel TypeScript emission](vercel-typescript.md) — a passing esbuild or tsc check does not guarantee Vercel’s per-file compiler can emit workspace imports.
 - [Build-tool test environment](build-tool-tests.md) — test Vite configuration in native Node; jsdom can break esbuild’s typed-array checks before tests run.
 - [External deployment artwork](external-deployment-artwork.md) — workspace uploads are not guaranteed to exist in an external build checkout.
+- [Hosting domains](hosting-domains.md) — user-supplied Vercel website origin; distinguish it from the Replit deployment and preview.
