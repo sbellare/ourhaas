@@ -27,6 +27,17 @@ function loadConfig(command) {
   return loadConfigFromFile({ command, mode: "production" }, configFile, undefined, "silent");
 }
 
+test("Vercel forwards membership API requests before serving the static website", async () => {
+  const config = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8"));
+  const rewrite = config.rewrites?.[0];
+  assert.equal(rewrite?.source, "/api/:path*");
+  const destination = new URL(rewrite.destination.replace(":path*", "haas/membership"));
+  assert.equal(destination.protocol, "https:");
+  assert.equal(destination.pathname, "/api/haas/membership");
+  assert(!destination.hostname.endsWith(".replit.dev"), "Do not proxy production requests to a development preview");
+  assert.notEqual(destination.hostname, "localhost");
+});
+
 test("homepage artwork is included in the website source assets", async () => {
   const home = await readFile(new URL("../src/pages/home.tsx", import.meta.url), "utf8");
   const imageImport = home.match(/import\s+heroImg\s+from\s+["'](@\/assets\/[^"']+)["']/);
