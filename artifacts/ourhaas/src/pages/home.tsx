@@ -26,7 +26,7 @@ export default function Home() {
               Konkani roots,<br /><em className="font-normal text-primary">Houston</em> home.
             </h1>
             <p className="rise mt-7 max-w-lg text-lg text-muted-foreground" style={{ animationDelay: "180ms" }}>
-              A warm, intergenerational gathering place for Mangalorean Konkani families in the Houston area, carrying coastal traditions into community life in the USA.
+              A warm, intergenerational gathering place for Konkani families in the Houston area, carrying coastal traditions into community life in the USA.
             </p>
             <div className="rise mt-9 flex flex-wrap gap-3" style={{ animationDelay: "260ms" }}>
               <Link href="/events" data-testid="link-hero-events" className="group inline-flex items-center gap-2 rounded-full bg-secondary px-6 py-3 font-semibold text-secondary-foreground transition hover:-translate-y-0.5">

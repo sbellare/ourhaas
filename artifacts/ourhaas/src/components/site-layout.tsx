@@ -113,7 +113,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
               <Lamp className="h-12 w-12" />
               <p className="font-display text-2xl">Houston Area Amchigele Samaj</p>
             </div>
-            <p className="mt-4 max-w-md text-secondary-foreground/75">Konkani roots, Houston home. A gathering place for Mangalorean Konkani families across generations.</p>
+            <p className="mt-4 max-w-md text-secondary-foreground/75">Konkani roots, Houston home. A gathering place for Konkani families across generations.</p>
           </div>
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent">Explore</p>
