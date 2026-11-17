@@ -5,8 +5,7 @@ import { ArrowRight, ArrowUpRight, Mail } from "lucide-react";
 import { useListEvents, useListContentPages, useListCommittee, getListCommitteeQueryKey, getListEventsQueryKey, useGetMembership, getGetMembershipQueryKey, type CommunityEvent } from "@workspace/api-client-react";
 import { EventDialog, EventRow, EventSkeleton, LoadError, UpcomingEmpty } from "@/components/event-bits";
 import { CONTACT_EMAIL, initials, splitEvents } from "@/lib/haas";
-
-const heroImg = `${import.meta.env.BASE_URL}hero-coast.jpg`;
+import heroImg from "@assets/724242577_18110783840493953_2215237320332989956_n_1794888058267.jpeg";
 
 export default function Home() {
   const events = useListEvents({ query: { queryKey: getListEventsQueryKey(), refetchInterval: 30000 } });
@@ -39,8 +38,8 @@ export default function Home() {
           </div>
           <figure className="rise relative" style={{ animationDelay: "200ms" }}>
             <div className="absolute -inset-3 rotate-2 rounded-[2.5rem] bg-accent/40" aria-hidden />
-            <img src={heroImg} alt="Illustration of a brass lamp, palms and a tiled-roof coastal house at dusk" className="relative aspect-[4/5] w-full rounded-[2.2rem] object-cover shadow-2xl md:aspect-[4/4.6]" />
-            <figcaption className="absolute bottom-4 left-4 rounded-full bg-background/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Illustrative artwork</figcaption>
+            <img src={heroImg} alt="Konkani dialects: a north-to-south continuum, illustrated from Koli in the north to Kochi Konkani in the south" width={526} height={526} className="relative h-auto w-full rounded-md shadow-2xl" />
+            <figcaption className="relative mt-3 inline-block rounded-full bg-background/90 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">Illustrative artwork</figcaption>
           </figure>
         </div>
       </section>
