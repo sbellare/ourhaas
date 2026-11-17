@@ -406,9 +406,11 @@ describe("membership registration safeguards", () => {
     expect(readWhere).toHaveBeenCalledWith(eq(membershipTable.id, 1));
   }
 
-  async function expectRejectedWithoutChanges(input: Record<string, unknown>, status = 400) {
+  async function expectRejectedWithoutChanges(
+    input: Record<string, unknown>, status = 400, headers: Record<string, string> = {},
+  ) {
     const before = structuredClone(saved);
-    const response = await request(app).put("/haas/membership").send(input);
+    const response = await request(app).put("/haas/membership").set(headers).send(input);
     expect(response.status).toBe(status);
     expect(response.body.error).toEqual(expect.any(String));
     expectNoStorageAccess();
@@ -419,6 +421,7 @@ describe("membership registration safeguards", () => {
     // observable and unchanged after every rejected request.
     await expectPublicMembership(membership);
     expect(saved).toEqual(before);
+    return response;
   }
 
   it("returns 503 without inventing public membership when the singleton is missing", async () => {
@@ -495,6 +498,55 @@ describe("membership registration safeguards", () => {
     mocks.userId = null;
     await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 401);
     expect(mocks.getUser).not.toHaveBeenCalled();
+  });
+
+  it.each<{ name: string; headers: Record<string, string> }>([
+    { name: "direct host", headers: { Host: "haas.example.com" } },
+    { name: "forwarded host", headers: {
+      Host: "internal.example.com", "X-Forwarded-Host": "haas.example.com",
+    } },
+  ])("rejects a mismatched Origin against the $name for the verified administrator", async ({ headers }) => {
+    const response = await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 403, {
+      ...headers, Origin: "https://attacker.example.com",
+    });
+    expect(response.body).toEqual({ error: "Cross-origin changes are not allowed." });
+    expect(mocks.getUser).toHaveBeenCalledExactlyOnceWith("user_test");
+  });
+
+  it("saves membership when Origin matches X-Forwarded-Host rather than the internal Host", async () => {
+    const changes = { ...membership, year: 2031 };
+    const response = await request(app).put("/haas/membership")
+      .set("Host", "internal.example.com")
+      .set("X-Forwarded-Host", "haas.example.com")
+      .set("Origin", "https://haas.example.com")
+      .send(changes);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(changes);
+    expect(mocks.getUser).toHaveBeenCalledExactlyOnceWith("user_test");
+    expect(mocks.update).toHaveBeenCalledExactlyOnceWith(membershipTable);
+    expect(setMembership).toHaveBeenCalledExactlyOnceWith(changes);
+    expect(updateWhere).toHaveBeenCalledExactlyOnceWith(eq(membershipTable.id, 1));
+    expect(saved).toEqual({ id: 1, ...changes });
+    await expectPublicMembership(changes);
+  });
+
+  it("fails closed without changing membership when identity verification is unavailable", async () => {
+    mocks.getUser.mockRejectedValue(new Error("Identity verification unavailable"));
+
+    const response = await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 500);
+
+    expect(response.body).toEqual({ error: "Request failed" });
+    expect(mocks.getUser).toHaveBeenCalledExactlyOnceWith("user_test");
+  });
+
+  it.each([undefined, "", "   "])("fails closed without changing membership when no administrator is configured (%j)", async (email) => {
+    vi.stubEnv("HAAS_ADMIN_EMAIL", email);
+
+    const response = await expectRejectedWithoutChanges({ ...membership, year: 2031 }, 403);
+
+    expect(response.body).toEqual({ error: "Only assigned HAAS administrators can modify HAAS content." });
+    expect(mocks.getUser).toHaveBeenCalledExactlyOnceWith("user_test");
   });
 
   it.each([
