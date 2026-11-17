@@ -69,7 +69,7 @@ function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone
             <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
               <PopoverTrigger asChild>
                 <button type="button" data-testid="button-date-picker" className="flex items-center justify-between rounded-xl border-2 border-primary/40 bg-primary/5 px-4 py-3 text-left font-medium transition hover:border-primary">
-                  <span className={field.value ? "" : "text-muted-foreground"}>{field.value ? format(parseDay(field.value), "EEEE, MMMM d, yyyy") : "Choose a date on the calendar"}</span>
+                  <span className={field.value ? "" : "text-muted-foreground"}>{field.value ? format(parseDay(field.value), "EEEE, MMMM d, uuuu") : "Choose a date on the calendar"}</span>
                   <CalendarIcon className="h-5 w-5 text-primary" />
                 </button>
               </PopoverTrigger>
@@ -78,6 +78,11 @@ function EventForm({ initial, onDone }: { initial: CommunityEvent | null; onDone
                   mode="single"
                   selected={field.value ? parseDay(field.value) : undefined}
                   defaultMonth={field.value ? parseDay(field.value) : new Date()}
+                  formatters={{ formatCaption: (date) => format(date, "LLLL uuuu") }}
+                  labels={{
+                    labelDayButton: (date, modifiers) =>
+                      `${modifiers.today ? "Today, " : ""}${format(date, "EEEE, MMMM do, uuuu")}${modifiers.selected ? ", selected" : ""}`,
+                  }}
                   onSelect={(d) => { if (d) { field.onChange(toDay(d)); setPickerOpen(false); } }}
                 />
               </PopoverContent>

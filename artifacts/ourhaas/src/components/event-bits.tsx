@@ -20,7 +20,7 @@ export function DateBlock({ date, muted }: { date: string; muted?: boolean }) {
     <div className={`flex w-20 shrink-0 flex-col items-center rounded-2xl border py-3 ${muted ? "border-border bg-muted/60 text-muted-foreground" : "border-primary/30 bg-primary text-primary-foreground"}`}>
       <span className="font-mono text-[10px] uppercase tracking-[0.2em]">{format(d, "MMM")}</span>
       <span className="font-display text-4xl font-semibold leading-none">{format(d, "d")}</span>
-      <span className="font-mono text-[10px] opacity-80">{format(d, "yyyy")}</span>
+      <span className="font-mono text-[10px] opacity-80">{format(d, "uuuu")}</span>
     </div>
   );
 }
@@ -60,7 +60,7 @@ export function EventDialog({ event, onClose }: { event: CommunityEvent | null; 
               <div className="mb-2"><CategoryChip category={event.category} /></div>
               <DialogTitle className="font-display text-3xl font-semibold leading-tight" data-testid="text-event-title">{event.title}</DialogTitle>
               <DialogDescription className="font-mono text-xs uppercase tracking-[0.15em] text-primary">
-                {format(parseDay(event.date), "EEEE, MMMM d, yyyy")}
+                {format(parseDay(event.date), "EEEE, MMMM d, uuuu")}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 text-sm">

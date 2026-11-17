@@ -33,7 +33,7 @@ function MonthGrid({ events, onOpen, selectedMonth, onMonthChange }: {
     <div className="overflow-hidden rounded-3xl border border-card-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <button type="button" onClick={() => onMonthChange(subMonths(month, 1))} className="rounded-full p-2 hover:bg-muted" aria-label="Previous month" data-testid="button-prev-month"><ChevronLeft className="h-5 w-5" /></button>
-        <p className="font-display text-2xl font-semibold" data-testid="text-month">{format(month, "MMMM yyyy")}</p>
+        <p className="font-display text-2xl font-semibold" data-testid="text-month">{format(month, "MMMM uuuu")}</p>
         <button type="button" onClick={() => onMonthChange(addMonths(month, 1))} className="rounded-full p-2 hover:bg-muted" aria-label="Next month" data-testid="button-next-month"><ChevronRight className="h-5 w-5" /></button>
       </div>
       <div className="grid grid-cols-7 border-b border-border bg-muted/50 text-center font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">

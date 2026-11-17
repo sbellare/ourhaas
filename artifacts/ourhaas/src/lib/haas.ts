@@ -4,11 +4,17 @@ import type { CommunityEvent } from "@workspace/api-client-react";
 /** Parse a YYYY-MM-DD calendar day as a LOCAL date (never via UTC). */
 export function parseDay(day: string): Date {
   const [y, m, d] = day.split("-").map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
+  const date = new Date(0);
+  // The multi-argument Date constructor remaps years 0–99 to 1900–1999.
+  // Set all components together so leap days in year 0000 also survive.
+  date.setFullYear(y, (m || 1) - 1, d || 1);
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
 export function toDay(date: Date): string {
-  return format(date, "yyyy-MM-dd");
+  // Extended Gregorian years include 0000; yyyy is year-of-era (0001 BC).
+  return format(date, "uuuu-MM-dd");
 }
 
 export function todayDay(): string {

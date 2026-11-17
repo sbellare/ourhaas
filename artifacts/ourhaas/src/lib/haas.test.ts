@@ -12,6 +12,8 @@ describe("calendar-day helpers", () => {
   it.each([
     "2024-02-29", "2000-02-29", "2031-12-31", "2032-01-01",
     "2032-03-14", "2032-11-07", "2032-07-04",
+    "0000-01-01", "0000-02-29", "0001-01-01", "0004-02-29",
+    "0099-12-31", "0100-01-01", "9999-12-31",
   ])("preserves %s as local midnight without a UTC day shift", (day) => {
     const date = parseDay(day);
     const [year, month, dateOfMonth] = day.split("-").map(Number);
@@ -24,6 +26,18 @@ describe("calendar-day helpers", () => {
     expect(toDay(new Date(2032, 1, 29, 23, 30))).toBe("2032-02-29");
     expect(toDay(new Date(2031, 11, 31, 23, 59))).toBe("2031-12-31");
   });
+
+  it.each(Array.from({ length: 100 }, (_, year) => year))(
+    "formats local year %i using the same four-digit Gregorian year",
+    (year) => {
+      // Construct independently from parseDay so matching helper bugs cannot pass.
+      const date = new Date(2032, 5, 15, 23, 30);
+      date.setFullYear(year);
+      const day = `${String(year).padStart(4, "0")}-06-15`;
+      expect(toDay(date)).toBe(day);
+      expect(toDay(parseDay(day))).toBe(day);
+    },
+  );
 
   it.each([
     [new Date(2031, 11, 31, 23, 59, 59), "2031-12-31"],

@@ -90,6 +90,41 @@ describe("event calendar dates", () => {
     await userEvent.click(screen.getByRole("button", { name: label }));
   }
 
+  it.each([
+    ["0000-02-29", "Tuesday, February 29, 0000", /Tuesday, February 29th, 0000/],
+    ["0001-06-15", "Friday, June 15, 0001", /Friday, June 15th, 0001/],
+    ["0099-12-31", "Thursday, December 31, 0099", /Thursday, December 31st, 0099/],
+  ] as const)("preserves early event date %s through selection, save and reopening", async (day, display, label) => {
+    rows = [{ ...seed, date: day }];
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByTestId("button-edit-42"));
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent(display);
+    await user.click(screen.getByTestId("button-date-picker"));
+    const selectedDay = screen.getByRole("button", { name: label });
+    expect(selectedDay).toHaveAttribute("data-selected-single", "true");
+    expect(document.querySelector(".rdp-caption_label")).toHaveTextContent(day.slice(0, 4));
+    // Select a different day and return, exercising the real onSelect handler.
+    await user.click(screen.getByRole("button", { name: /, (February|June|December) 14th,/ }));
+    await pickDay(label);
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent(display);
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(calls.find((call) => call.method === "PUT")?.body).toMatchObject({ date: day });
+    cleanup();
+    mount();
+    await user.click(await screen.findByTestId("button-edit-42"));
+    expect(screen.getByTestId("button-date-picker")).toHaveTextContent(display);
+    await user.click(screen.getByTestId("button-date-picker"));
+    expect(screen.getByRole("button", { name: label })).toHaveAttribute("data-selected-single", "true");
+    cleanup();
+    mount(<Events />);
+    const card = await screen.findByTestId("card-event-42");
+    expect(card).toHaveTextContent(day.slice(0, 4));
+    await user.click(card);
+    expect(screen.getByRole("dialog")).toHaveTextContent(display);
+  });
+
   it("creates the selected leap day and refreshes an already mounted public list", async () => {
     const user = userEvent.setup();
     mount(<><Admin /><div data-testid="public-events"><Events /></div></>);
