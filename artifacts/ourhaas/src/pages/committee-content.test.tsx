@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Router, Route } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -42,6 +42,16 @@ function mountCommitteePage(path: string, element: ReactNode) {
   </Router></QueryClientProvider>);
 }
 
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<Response>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 beforeEach(() => {
   members = structuredClone(originalMembers);
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
@@ -57,6 +67,71 @@ beforeEach(() => {
     }]);
     throw new Error(`Unexpected request: ${url}`);
   }));
+});
+
+describe("committee request recovery", () => {
+  it.each(committeePages.flatMap((page) =>
+    ["server error", "network failure"].map((failure) => ({ ...page, failure })),
+  ))("recovers all six cards after a $failure on the $destination", async ({ path, element, testId, failure }) => {
+    const initial = deferredResponse();
+    const retried = deferredResponse();
+    const requestCommittee = vi.fn()
+      .mockImplementationOnce(() => initial.promise)
+      .mockImplementationOnce(() => retried.promise);
+    const defaultFetch = fetch;
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request, init?: RequestInit) =>
+      String(input) === "/api/haas/committee"
+        ? requestCommittee()
+        : defaultFetch(input, init),
+    ));
+
+    mountCommitteePage(path, element);
+    const loading = screen.getByText("Loading committee…");
+    // Scope to committee cards: Home has other independently loaded sections.
+    expect(loading).toHaveAttribute("role", "status");
+    const committee = within(loading.closest("section")!);
+    const cardPattern = new RegExp(`^${testId}\\d+$`);
+    expect(committee.queryAllByTestId(cardPattern)).toHaveLength(0);
+    expect(committee.queryByText("We couldn't load committee members.")).not.toBeInTheDocument();
+    expect(requestCommittee).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      if (failure === "network failure") {
+        initial.reject(new TypeError("Failed to fetch"));
+      } else {
+        initial.resolve(new Response(JSON.stringify({ error: "Service unavailable" }), {
+          status: 503, headers: { "content-type": "application/json" },
+        }));
+      }
+    });
+
+    expect(await committee.findByText("We couldn't load committee members.")).toBeVisible();
+    expect(committee.queryByRole("status")).not.toBeInTheDocument();
+    expect(committee.queryAllByTestId(cardPattern)).toHaveLength(0);
+    const retry = committee.getByRole("button", { name: "Try again" });
+    expect(retry).toBeEnabled();
+    expect(requestCommittee).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(retry);
+    await waitFor(() => expect(requestCommittee).toHaveBeenCalledTimes(2));
+    expect(committee.queryAllByTestId(cardPattern)).toHaveLength(0);
+    await act(async () => {
+      retried.resolve(new Response(JSON.stringify(originalMembers), {
+        headers: { "content-type": "application/json" },
+      }));
+    });
+
+    expect(await committee.findAllByTestId(cardPattern)).toHaveLength(6);
+    for (const [index, member] of originalMembers.entries()) {
+      const card = committee.getByTestId(`${testId}${index}`);
+      expect(within(card).getByText(member.role, { exact: true })).toBeVisible();
+      expect(within(card).getByText(member.name, { exact: true })).toBeVisible();
+    }
+    expect(committee.queryByText("We couldn't load committee members.")).not.toBeInTheDocument();
+    expect(committee.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+    expect(committee.queryByRole("status")).not.toBeInTheDocument();
+    expect(requestCommittee).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("committee layout regression", () => {
