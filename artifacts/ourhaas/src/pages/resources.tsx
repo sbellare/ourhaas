@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import ReactMarkdown from "react-markdown";
 import { ArrowLeft, ArrowUpRight, FileText, Search } from "lucide-react";
-import { useListContentPages, getListContentPagesQueryKey, type ContentPage } from "@workspace/api-client-react";
+import { useListContentPages, getListContentPagesQueryKey, useGetAdminStatus, getGetAdminStatusQueryKey, type ContentPage } from "@workspace/api-client-react";
 import { PageHero } from "@/components/site-layout";
 import { LoadError } from "@/components/event-bits";
 
@@ -59,6 +59,7 @@ function resolveHref(href: string | undefined, base: string) {
 
 export function ResourcePage() {
   const { slug } = useParams<{ slug: string }>();
+  const admin = useGetAdminStatus({ query: { queryKey: getGetAdminStatusQueryKey(), retry: false } });
   const pages = useListContentPages({ query: { queryKey: getListContentPagesQueryKey(), refetchInterval: 30000 } });
   const page = pages.data?.find((p) => p.slug === slug);
 
@@ -75,6 +76,9 @@ export function ResourcePage() {
       ) : (
         <article className="mt-6">
           <h1 className="font-display text-5xl font-semibold leading-tight" data-testid="text-page-title">{page.title}</h1>
+          {page.slug === "event-payments" && admin.data?.isAdmin && (
+            <Link href="/admin#event-payments" className="mt-4 inline-block rounded-full border border-primary px-5 py-2 font-semibold text-primary">Edit Event Payments</Link>
+          )}
           {page.sourceUrl && <a href={page.sourceUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 font-mono text-xs text-muted-foreground hover:text-primary">Original page <ArrowUpRight className="h-3 w-3" /></a>}
           <div className="toran mt-6 opacity-70" aria-hidden />
           <div className="prose prose-haas prose-lg mt-8 max-w-none prose-headings:font-serif prose-headings:font-semibold prose-img:rounded-2xl" data-testid="content-markdown">

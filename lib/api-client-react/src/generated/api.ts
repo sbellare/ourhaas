@@ -25,6 +25,7 @@ import type {
   CommitteeMemberUpdate,
   CommunityEvent,
   ContentPage,
+  ContentPageInput,
   EventInput,
   HealthStatus,
   MembershipSettings
@@ -809,6 +810,95 @@ export function useListContentPages<TData = Awaited<ReturnType<typeof listConten
 
 
 
+
+export const getUpdateContentPageUrl = (slug: 'event-payments',) => {
+
+
+
+
+  return `/api/haas/pages/${slug}`
+}
+
+/**
+ * @summary Update the Event Payments page as a verified administrator
+ */
+export const updateContentPage = async (slug: 'event-payments',
+    contentPageInput: ContentPageInput, options?: Parameters<typeof customFetch>[1]): Promise<ContentPage> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ContentPage>(getUpdateContentPageUrl(slug),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(contentPageInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateContentPageMutationKey = () => ['updateContentPage'] as const;
+
+export const getUpdateContentPageMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContentPage>>, TError,UpdateContentPageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateContentPage>>, TError,UpdateContentPageMutationVariables, TContext> => {
+
+const mutationKey = getUpdateContentPageMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateContentPage>>, UpdateContentPageMutationVariables> = (props) => {
+          const {slug,data} = props ?? {};
+
+          return  updateContentPage(slug,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateContentPageMutationResult = NonNullable<Awaited<ReturnType<typeof updateContentPage>>>
+    export type UpdateContentPageMutationBody = BodyType<ContentPageInput>
+    export type UpdateContentPageMutationError = ErrorType<void>
+    export type UpdateContentPageMutationVariables = {slug: 'event-payments';data: BodyType<ContentPageInput>}
+
+    /**
+ * @summary Update the Event Payments page as a verified administrator
+ */
+export const useUpdateContentPage = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContentPage>>, TError,UpdateContentPageMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateContentPage>>,
+        TError,
+        UpdateContentPageMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateContentPageMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

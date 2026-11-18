@@ -1,7 +1,7 @@
 import express from "express";
 import request from "supertest";
 import { eq } from "drizzle-orm";
-import { membershipTable } from "@workspace/db";
+import { membershipTable, pageOverridesTable } from "@workspace/db";
 import { COMMITTEE_RESOURCE_SLUG, COMMITTEE_TITLE } from "@workspace/haas-content";
 import sourcePages from "../lib/source-content.json";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +25,7 @@ vi.mock("@workspace/db", () => ({
   eventsTable: { id: "id", date: "date" },
   committeeTable: { id: "id", position: "position" },
   membershipTable: { id: "id" },
+  pageOverridesTable: { slug: "slug" },
 }));
 import router from "./haas";
 
@@ -62,6 +63,89 @@ beforeEach(() => {
   mocks.userId = null;
 });
 afterEach(() => vi.unstubAllEnvs());
+
+describe("Event Payments page editing", () => {
+  let saved: { slug: string; title: string; markdown: string } | undefined;
+  const content = { title: "Updated Event Payments", markdown: "# Payment information\n\n[Register](https://www.zeffy.com/en-US/ticketing/example)" };
+
+  beforeEach(() => {
+    saved = undefined;
+    mocks.select.mockImplementation(() => ({
+      from: (table: unknown) => ({ orderBy: async () => table === pageOverridesTable && saved ? [saved] : [] }),
+    }));
+    mocks.insert.mockImplementation(() => ({
+      values: (value: typeof saved) => ({
+        onConflictDoUpdate: () => ({
+          returning: async () => { saved = value; return saved ? [saved] : []; },
+        }),
+      }),
+    }));
+  });
+
+  const signIn = () => {
+    mocks.userId = "assigned-admin";
+    mocks.getUser.mockResolvedValue(identity());
+  };
+
+  it("starts with the original content and persists admin edits in subsequent public reads", async () => {
+    const original = sourcePages.find((page) => page.slug === "event-payments")!;
+    const before = await request(app).get("/haas/pages");
+    expect(before.body.find((page: { slug: string }) => page.slug === original.slug)).toEqual(original);
+    signIn();
+    const response = await request(app).put("/haas/pages/event-payments").send(content);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ...original, ...content });
+    mocks.userId = null;
+    const after = await request(app).get("/haas/pages");
+    expect(after.headers["cache-control"]).toBe("no-store");
+    expect(after.body.find((page: { slug: string }) => page.slug === original.slug)).toEqual(response.body);
+  });
+
+  it("rejects anonymous writes before accessing storage", async () => {
+    expect((await request(app).put("/haas/pages/event-payments").send(content)).status).toBe(401);
+    expectNoStorageAccess();
+  });
+
+  it.each(["other-account", "unverified"])("rejects %s writes", async (kind) => {
+    mocks.userId = "not-authorized";
+    mocks.getUser.mockResolvedValue(kind === "unverified" ? identity(assignedEmail, "unverified") : identity("other@example.com"));
+    expect((await request(app).put("/haas/pages/event-payments").send(content)).status).toBe(403);
+    expectNoStorageAccess();
+  });
+
+  it("rejects cross-site writes without accessing storage", async () => {
+    signIn();
+    const response = await request(app).put("/haas/pages/event-payments").set("Origin", "https://unrelated.example").send(content);
+    expect(response.status).toBe(403);
+    expectNoStorageAccess();
+  });
+
+  it.each([
+    { title: "  ", markdown: "Text" },
+    { title: "Title", markdown: "\n\t" },
+    { title: "x".repeat(201), markdown: "Text" },
+    { title: "Title", markdown: "x".repeat(50001) },
+    { title: "Title\u0000", markdown: "Text" },
+    { title: "Title", markdown: "Text\u0000" },
+  ])("rejects invalid content before saving", async (data) => {
+    signIn();
+    expect((await request(app).put("/haas/pages/event-payments").send(data)).status).toBe(400);
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("does not permit editing a different archived page", async () => {
+    signIn();
+    expect((await request(app).put("/haas/pages/present-haas-committee").send(content)).status).toBe(400);
+    expectNoStorageAccess();
+  });
+
+  it("reports save failures without returning false success", async () => {
+    signIn();
+    mocks.insert.mockImplementation(() => { throw new Error("Storage unavailable"); });
+    expect((await request(app).put("/haas/pages/event-payments").send(content)).status).toBe(500);
+    expect(saved).toBeUndefined();
+  });
+});
 
 describe("current committee resource", () => {
   const roster = [

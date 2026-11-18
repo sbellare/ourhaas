@@ -285,6 +285,32 @@ export const ListContentPagesResponse = zod.array(ListContentPagesResponseItem)
 
 
 /**
+ * @summary Update the Event Payments page as a verified administrator
+ */
+export const UpdateContentPageParams = zod.object({
+  "slug": zod.enum(['event-payments'])
+})
+
+export const updateContentPageBodyTitleMax = 200;
+
+export const updateContentPageBodyMarkdownMax = 50000;
+
+
+
+export const UpdateContentPageBody = zod.object({
+  "title": zod.string().min(1).max(updateContentPageBodyTitleMax),
+  "markdown": zod.string().min(1).max(updateContentPageBodyMarkdownMax)
+})
+
+export const UpdateContentPageResponse = zod.object({
+  "slug": zod.string(),
+  "title": zod.string(),
+  "markdown": zod.string(),
+  "sourceUrl": zod.string()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

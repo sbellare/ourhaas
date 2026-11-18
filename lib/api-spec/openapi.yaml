@@ -138,6 +138,34 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/ContentPage" }
+  /haas/pages/{slug}:
+    put:
+      operationId: updateContentPage
+      summary: Update the Event Payments page as a verified administrator
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string, enum: [event-payments] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContentPageInput" }
+      responses:
+        "200":
+          description: Saved page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContentPage" }
+        "400":
+          description: Invalid page or content
+        "401":
+          description: Sign-in required
+        "403":
+          description: Verified administrator required
+        "500":
+          description: Page could not be saved
   /healthz:
     get:
       operationId: healthCheck
@@ -214,6 +242,12 @@ components:
         title: { type: string }
         markdown: { type: string }
         sourceUrl: { type: string }
+    ContentPageInput:
+      type: object
+      required: [title, markdown]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        markdown: { type: string, minLength: 1, maxLength: 50000 }
     HealthStatus:
       type: object
       properties:

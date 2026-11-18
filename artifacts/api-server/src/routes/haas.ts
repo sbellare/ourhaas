@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
-import { db, eventsTable, committeeTable, membershipTable } from "@workspace/db";
+import { db, eventsTable, committeeTable, membershipTable, pageOverridesTable } from "@workspace/db";
 import { asc, eq } from "drizzle-orm";
 import {
   ListEventsResponse, CreateEventBody, CreateEventResponse, UpdateEventParams,
@@ -8,6 +8,7 @@ import {
   GetAdminStatusResponse, ListContentPagesResponse,
   ListCommitteeResponse, UpdateCommitteeMemberBody, UpdateCommitteeMemberParams, UpdateCommitteeMemberResponse,
   GetMembershipResponse, UpdateMembershipBody, UpdateMembershipResponse,
+  UpdateContentPageBody, UpdateContentPageParams, UpdateContentPageResponse,
 } from "@workspace/api-zod";
 import sourcePages from "../lib/source-content.json";
 import { COMMITTEE_RESOURCE_SLUG, COMMITTEE_TITLE } from "@workspace/haas-content";
@@ -74,16 +75,46 @@ router.put("/haas/membership", requireAdmin, async (req, res): Promise<void> => 
 
 router.get("/haas/pages", async (_req, res): Promise<void> => {
   const members = await db.select().from(committeeTable).orderBy(asc(committeeTable.position));
+  const overrides = await db.select().from(pageOverridesTable).orderBy(asc(pageOverridesTable.slug));
   const escape = (value: string) => value.replace(/[\\`*_{}\[\]()#+.!<>|~-]/g, "\\$&");
-  const pages = sourcePages.map((page) => page.slug !== COMMITTEE_RESOURCE_SLUG ? page : {
+  const pages = sourcePages.map((page) => {
+    if (page.slug === "event-payments") {
+      const saved = overrides.find((entry) => entry.slug === page.slug);
+      return saved ? { ...page, title: saved.title, markdown: saved.markdown } : page;
+    }
+    return page.slug !== COMMITTEE_RESOURCE_SLUG ? page : {
     ...page,
     title: COMMITTEE_TITLE,
     markdown: `# ${COMMITTEE_TITLE}\n\n_**Management Committee**_\n\n` +
       members.map((member) => `**${escape(member.role)}** — ${escape(member.name)}`).join("\n\n") +
       `\n\n${page.markdown}`,
+    };
   });
   res.setHeader("Cache-Control", "no-store");
   res.json(ListContentPagesResponse.parse(pages));
+});
+router.put("/haas/pages/:slug", requireAdmin, async (req, res): Promise<void> => {
+  const params = UpdateContentPageParams.safeParse(req.params);
+  const parsed = UpdateContentPageBody.safeParse(req.body);
+  if (!params.success || !parsed.success) {
+    res.status(400).json({ error: "Enter a title of 1–200 characters and page text of 1–50,000 characters." });
+    return;
+  }
+  const title = parsed.data.title.trim();
+  const markdown = parsed.data.markdown.trim();
+  if (!title || !markdown || /[\u0000-\u001f\u007f]/.test(title)
+    || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(markdown)) {
+    res.status(400).json({ error: "Title and page text must not be blank or contain invalid characters." });
+    return;
+  }
+  const original = sourcePages.find((page) => page.slug === params.data.slug);
+  if (!original) { res.status(404).json({ error: "Page not found." }); return; }
+  const [saved] = await db.insert(pageOverridesTable)
+    .values({ slug: params.data.slug, title, markdown })
+    .onConflictDoUpdate({ target: pageOverridesTable.slug, set: { title, markdown } }).returning();
+  if (!saved) { res.status(500).json({ error: "The page could not be saved. Please try again." }); return; }
+  res.setHeader("Cache-Control", "no-store");
+  res.json(UpdateContentPageResponse.parse({ ...original, title: saved.title, markdown: saved.markdown }));
 });
 router.get("/haas/committee", async (_req, res): Promise<void> => {
   res.setHeader("Cache-Control", "no-store");

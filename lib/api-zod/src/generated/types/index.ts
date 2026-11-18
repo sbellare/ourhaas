@@ -11,6 +11,7 @@ export * from './committeeMember';
 export * from './committeeMemberUpdate';
 export * from './communityEvent';
 export * from './contentPage';
+export * from './contentPageInput';
 export * from './eventInput';
 export * from './eventInputCategory';
 export * from './healthStatus';
